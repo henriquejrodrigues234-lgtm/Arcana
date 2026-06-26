@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "./supabaseClient"; // Nossa conexão direta com a nuvem!
+import { supabase } from "./supabaseClient";
 
 function App() {
   // =========================
@@ -9,8 +9,17 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false); // Alterna entre Login e Cadastro
+  const [showPassword, setShowPassword] = useState(false); // Olhinho da senha
+  const [isSignUp, setIsSignUp] = useState(false); 
   const [authError, setAuthError] = useState("");
+
+  // =========================
+  // UPDATE PASSWORD STATE
+  // =========================
+  const [openPasswordModal, setOpenPasswordModal] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordTargetShow, setPasswordTargetShow] = useState(false);
+  const [passwordStatusMsg, setPasswordStatusMsg] = useState("");
 
   // =========================
   // UI & NAV STATE
@@ -40,7 +49,6 @@ function App() {
     status: "quero",
   });
 
-  // Monitora se o usuário está logado ou não
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -54,7 +62,6 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Puxa os livros do Supabase sempre que o usuário mudar/logar
   useEffect(() => {
     if (user) {
       fetchBooks();
@@ -72,15 +79,13 @@ function App() {
     if (!authEmail || !authPassword) return;
 
     if (isSignUp) {
-      // Cadastro de nova conta mística
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email: authEmail,
         password: authPassword,
       });
       if (error) setAuthError(error.message);
       else alert("Conta criada com sucesso! Boas-vindas ao Arcana.");
     } else {
-      // Login em conta existente
       const { error } = await supabase.auth.signInWithPassword({
         email: authEmail,
         password: authPassword,
@@ -94,6 +99,30 @@ function App() {
     setSelectedBook(null);
   }
 
+  async function handleChangePassword(e) {
+    e.preventDefault();
+    setPasswordStatusMsg("");
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordStatusMsg("⚠️ A senha precisa ter pelo menos 6 caracteres.");
+      return;
+    }
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (error) {
+      setPasswordStatusMsg(`⚠️ Erro: ${error.message}`);
+    } else {
+      setPasswordStatusMsg("🔮 Palavra-passe alterada com sucesso!");
+      setTimeout(() => {
+        setOpenPasswordModal(false);
+        setNewPassword("");
+        setPasswordStatusMsg("");
+      }, 2000);
+    }
+  }
+
   // =========================
   // DATABASE CRUD (SUPABASE)
   // =========================
@@ -105,7 +134,6 @@ function App() {
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      // Adaptando nomes vindos do banco de dados (snake_case) para o front (camelCase)
       const formatted = data.map(b => ({
         ...b,
         startDate: b.start_date,
@@ -121,7 +149,6 @@ function App() {
 
     const formattedGenre = form.genre ? form.genre.trim() : "Outros";
     
-    // Objeto mapeado exatamente para as colunas que criamos no SQL
     const bookData = {
       user_id: user.id,
       title: form.title,
@@ -139,7 +166,6 @@ function App() {
     };
 
     if (editingId) {
-      // Atualizar na Nuvem
       const { error } = await supabase
         .from("books")
         .update(bookData)
@@ -153,7 +179,6 @@ function App() {
         }
       }
     } else {
-      // Inserir na Nuvem
       const { data, error } = await supabase
         .from("books")
         .insert([bookData])
@@ -256,9 +281,6 @@ function App() {
     reader.readAsDataURL(file);
   }
 
-  // =========================
-  // FILTERS & GRAPHICS
-  // =========================
   const favorites = books.filter((b) => b.favorite);
   const byStatus = (s) => books.filter((b) => b.status === s);
 
@@ -294,7 +316,6 @@ function App() {
     return `conic-gradient(${gradientParts.join(", ")})`;
   }
 
-  // COMPONENTES AUXILIARES
   function Stars({ value, onChange }) {
     return (
       <div className="stars">
@@ -345,9 +366,6 @@ function App() {
     );
   }
 
-  // =========================
-  // RENDER LOADING / AUTH SCREEN
-  // =========================
   if (authLoading) {
     return <div className="auth-loading"><h3>Consultando estrelas e grimórios... 🔮</h3></div>;
   }
@@ -367,7 +385,25 @@ function App() {
 
             <div className="input-group">
               <label>Palavra-passe (Senha)</label>
-              <input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="••••••••" required />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  value={authPassword} 
+                  onChange={(e) => setAuthPassword(e.target.value)} 
+                  placeholder="••••••••" 
+                  style={{ width: '100%', paddingRight: '40px' }}
+                  required 
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute', right: '10px', background: 'none', border: 'none', color: 'var(--gold-soft)', cursor: 'pointer', fontSize: '16px'
+                  }}
+                >
+                  {showPassword ? "👁️‍🗨️" : "👁️"}
+                </button>
+              </div>
             </div>
 
             {authError && <p className="auth-error-msg">⚠️ {authError}</p>}
@@ -379,7 +415,7 @@ function App() {
 
           <p className="auth-toggle-text">
             {isSignUp ? "Já possui chaves?" : "Novo neste círculo místico?"}{" "}
-            <span onClick={() => { setIsSignUp(!isSignUp); setAuthError(""); }}>
+            <span onClick={() => { setIsSignUp(!isSignUp); setAuthError(""); setShowPassword(false); }}>
               {isSignUp ? "Fazer Login" : "Criar uma Conta"}
             </span>
           </p>
@@ -388,9 +424,6 @@ function App() {
     );
   }
 
-  // =========================
-  // RENDER APP PRINCIPAL (LOGADO)
-  // =========================
   function renderPage() {
     if (page === "leituras") {
       const totalLivros = books.length;
@@ -524,7 +557,13 @@ function App() {
         <div className="user-badge-profile">✨ {user.email.split('@')[0]}</div>
         <button onClick={() => setPage("leituras")}>📚 Leituras</button>
         <button onClick={() => setPage("wishlist")}>⭐ Wishlist</button>
-        <button onClick={handleLogout} className="btn-logout-sidebar" style={{ marginTop: 'auto', background: '#321d22' }}>
+        
+        {/* Nova opção de alterar a senha no Painel */}
+        <button onClick={() => { setOpenPasswordModal(true); setPasswordStatusMsg(""); }} className="btn-change-pass-sidebar" style={{ marginTop: 'auto', background: 'rgba(214,180,125,0.05)', border: '1px dashed rgba(214,180,125,0.2)' }}>
+          🔑 Alterar Senha
+        </button>
+        
+        <button onClick={handleLogout} className="btn-logout-sidebar" style={{ background: '#321d22', marginTop: '10px' }}>
           🚪 Fechar Círculo (Sair)
         </button>
       </aside>
@@ -536,6 +575,42 @@ function App() {
         </header>
         {renderPage()}
       </main>
+
+      {/* POP-UP ALTERAR SENHA */}
+      {openPasswordModal && (
+        <div className="modal-overlay" onClick={() => setOpenPasswordModal(false)}>
+          <div className="modal cozy-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '350px' }}>
+            <h2>🔮 Nova Palavra-Passe</h2>
+            <p style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '15px' }}>Digite seu novo segredo de acesso abaixo:</p>
+            <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input 
+                  type={passwordTargetShow ? "text" : "password"} 
+                  placeholder="Mínimo 6 dígitos" 
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  style={{ width: '100%', paddingRight: '40px' }}
+                  required
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setPasswordTargetShow(!passwordTargetShow)}
+                  style={{ position: 'absolute', right: '10px', background: 'none', border: 'none', color: 'var(--gold-soft)', cursor: 'pointer' }}
+                >
+                  {passwordTargetShow ? "👁️‍🗨️" : "👁️"}
+                </button>
+              </div>
+
+              {passwordStatusMsg && <p style={{ fontSize: '13px', color: passwordStatusMsg.includes('sucesso') ? '#62ffb0' : '#ff6b6b', textAlign: 'center', margin: 0 }}>{passwordStatusMsg}</p>}
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button type="submit" style={{ flex: 1 }}>Atualizar</button>
+                <button type="button" onClick={() => setOpenPasswordModal(false)} style={{ background: '#444' }}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* POP-UP DETALHES */}
       {selectedBook && (
