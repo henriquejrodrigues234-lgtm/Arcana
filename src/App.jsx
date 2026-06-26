@@ -9,7 +9,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false); // Olhinho da senha
+  const [showPassword, setShowPassword] = useState(false); 
   const [isSignUp, setIsSignUp] = useState(false); 
   const [authError, setAuthError] = useState("");
 
@@ -32,6 +32,13 @@ function App() {
   const [selectedBook, setSelectedBook] = useState(null); 
 
   // =========================
+  // RASTREAMENTO & LOGS STATE
+  // =========================
+  const [readingLogs, setReadingLogs] = useState([]);
+  const [inputPageUpdate, setInputPageUpdate] = useState("");
+  const [logStatusMsg, setLogStatusMsg] = useState("");
+
+  // =========================
   // FORM STATE
   // =========================
   const [form, setForm] = useState({
@@ -47,6 +54,7 @@ function App() {
     cover: "",
     summary: "",
     status: "quero",
+    current_page: 0
   });
 
   useEffect(() => {
@@ -65,8 +73,10 @@ function App() {
   useEffect(() => {
     if (user) {
       fetchBooks();
+      fetchLogs();
     } else {
       setBooks([]);
+      setReadingLogs([]);
     }
   }, [user]);
 
@@ -107,10 +117,7 @@ function App() {
       return;
     }
 
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword
-    });
-
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) {
       setPasswordStatusMsg(`⚠️ Erro: ${error.message}`);
     } else {
@@ -124,7 +131,7 @@ function App() {
   }
 
   // =========================
-  // DATABASE CRUD (SUPABASE)
+  // DATABASE CRUD & LOGS
   // =========================
   async function fetchBooks() {
     setBooksLoading(true);
@@ -137,17 +144,27 @@ function App() {
       const formatted = data.map(b => ({
         ...b,
         startDate: b.start_date,
-        endDate: b.end_date
+        endDate: b.end_date,
+        current_page: b.current_page || 0
       }));
       setBooks(formatted);
     }
     setBooksLoading(false);
   }
 
+  async function fetchLogs() {
+    const { data, error } = await supabase
+      .from("reading_logs")
+      .select("*")
+      .order("logged_at", { ascending: false });
+    if (!error && data) setReadingLogs(data);
+  }
+
   async function saveBook() {
     if (!form.title || !form.author || !user) return;
 
     const formattedGenre = form.genre ? form.genre.trim() : "Outros";
+    const totalPagesNum = parseInt(form.pages) || 0;
     
     const bookData = {
       user_id: user.id,
@@ -156,13 +173,14 @@ function App() {
       publisher: form.publisher,
       rating: form.rating,
       favorite: form.favorite,
-      pages: form.pages,
+      pages: totalPagesNum > 0 ? totalPagesNum.toString() : "",
       start_date: form.startDate,
       end_date: form.endDate,
       genre: formattedGenre,
       cover: form.cover,
       summary: form.summary,
       status: form.status,
+      current_page: form.current_page || 0
     };
 
     if (editingId) {
@@ -172,7 +190,7 @@ function App() {
         .eq("id", editingId);
 
       if (!error) {
-        const updatedLocal = { ...form, genre: formattedGenre, id: editingId };
+        const updatedLocal = { ...form, genre: formattedGenre, id: editingId, current_page: form.current_page || 0 };
         setBooks(books.map((b) => (b.id === editingId ? updatedLocal : b)));
         if (selectedBook && selectedBook.id === editingId) {
           setSelectedBook(updatedLocal);
@@ -185,7 +203,7 @@ function App() {
         .select();
 
       if (!error && data) {
-        const created = { ...data[0], startDate: data[0].start_date, endDate: data[0].end_date };
+        const created = { ...data[0], startDate: data[0].start_date, endDate: data[0].end_date, current_page: data[0].current_page || 0 };
         setBooks([created, ...books]);
       }
     }
@@ -194,15 +212,57 @@ function App() {
     setOpenModal(false);
   }
 
+  async function handleUpdateProgress(e) {
+    e.preventDefault();
+    setLogStatusMsg("");
+    if (!selectedBook) return;
+
+    const targetPage = parseInt(inputPageUpdate);
+    const totalPages = parseInt(selectedBook.pages) || 0;
+
+    if (isNaN(targetPage) || targetPage < 0) {
+      setLogStatusMsg("⚠️ Insira uma página válida.");
+      return;
+    }
+    if (totalPages > 0 && targetPage > totalPages) {
+      setLogStatusMsg(`⚠️ A página não pode ser maior que o total (${totalPages}).`);
+      return;
+    }
+
+    const pagesJustRead = targetPage - selectedBook.current_page;
+
+    // Atualiza a página atual do livro no banco
+    const { error: bookError } = await supabase
+      .from("books")
+      .update({ current_page: targetPage })
+      .eq("id", selectedBook.id);
+
+    if (!bookError) {
+      // Se ele leu páginas a mais, registra um Log Diário
+      if (pagesJustRead > 0) {
+        await supabase.from("reading_logs").insert([
+          { user_id: user.id, book_id: selectedBook.id, pages_read: pagesJustRead }
+        ]);
+        fetchLogs();
+      }
+
+      // Atualiza os estados locais
+      const updatedBook = { ...selectedBook, current_page: targetPage };
+      setBooks(books.map(b => b.id === selectedBook.id ? updatedBook : b));
+      setSelectedBook(updatedBook);
+      setInputPageUpdate("");
+      setLogStatusMsg("🔮 Progresso salvo e log registrado!");
+    } else {
+      setLogStatusMsg("⚠️ Falha ao salvar progresso.");
+    }
+  }
+
   async function deleteBook(id, e) {
     if (e) e.stopPropagation();
     const { error } = await supabase.from("books").delete().eq("id", id);
-    
     if (!error) {
       setBooks(books.filter((b) => b.id !== id));
-      if (selectedBook && selectedBook.id === id) {
-        setSelectedBook(null);
-      }
+      if (selectedBook && selectedBook.id === id) setSelectedBook(null);
     }
   }
 
@@ -212,11 +272,7 @@ function App() {
     if (!currentBook) return;
 
     const nextFavoriteState = !currentBook.favorite;
-
-    const { error } = await supabase
-      .from("books")
-      .update({ favorite: nextFavoriteState })
-      .eq("id", id);
+    const { error } = await supabase.from("books").update({ favorite: nextFavoriteState }).eq("id", id);
 
     if (!error) {
       setBooks(books.map((b) => b.id === id ? { ...b, favorite: nextFavoriteState } : b));
@@ -228,11 +284,7 @@ function App() {
 
   async function updateStatus(id, status, e) {
     if (e) e.stopPropagation();
-    const { error } = await supabase
-      .from("books")
-      .update({ status })
-      .eq("id", id);
-
+    const { error } = await supabase.from("books").update({ status }).eq("id", id);
     if (!error) {
       setBooks(books.map((b) => b.id === id ? { ...b, status } : b));
       if (selectedBook && selectedBook.id === id) {
@@ -255,12 +307,15 @@ function App() {
       cover: "",
       summary: "",
       status: "quero",
+      current_page: 0
     });
     setEditingId(null);
   }
 
   function handleCardClick(book) {
     setSelectedBook(book); 
+    setLogStatusMsg("");
+    setInputPageUpdate("");
   }
 
   function handleEditFromPreview() {
@@ -273,12 +328,40 @@ function App() {
   function handleFile(e) {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onload = () => {
-      setForm({ ...form, cover: reader.result });
-    };
+    reader.onload = () => setForm({ ...form, cover: reader.result });
     reader.readAsDataURL(file);
+  }
+
+  // =========================
+  // CALCULOS DOS LOGS (TEMPO)
+  // =========================
+  function getStatsByPeriod() {
+    const now = new Date();
+    let dayTotal = 0;
+    let weekTotal = 0;
+    let monthTotal = 0;
+
+    readingLogs.forEach(log => {
+      const logDate = new Date(log.logged_at);
+      const diffTime = Math.abs(now - logDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      // Hoje
+      if (logDate.toDateString() === now.toDateString()) {
+        dayTotal += log.pages_read;
+      }
+      // Últimos 7 dias
+      if (diffDays <= 7) {
+        weekTotal += log.pages_read;
+      }
+      // Últimos 30 dias
+      if (diffDays <= 30) {
+        monthTotal += log.pages_read;
+      }
+    });
+
+    return { dayTotal, weekTotal, monthTotal };
   }
 
   const favorites = books.filter((b) => b.favorite);
@@ -291,18 +374,11 @@ function App() {
       const g = book.genre || "Outros";
       counts[g] = (counts[g] || 0) + 1;
     });
-
     const colors = ["#8c62ff", "#ff62b0", "#62ffb0", "#ffd36e", "#ff9f43", "#4db5ff", "#b8a8c7"];
     const total = books.length;
-    
-    return Object.keys(counts)
-      .map((genre, index) => ({
-        name: genre,
-        count: counts[genre],
-        percentage: Math.round((counts[genre] / total) * 100),
-        color: colors[index % colors.length]
-      }))
-      .sort((a, b) => b.count - a.count);
+    return Object.keys(counts).map((genre, index) => ({
+      name: genre, count: counts[genre], percentage: Math.round((counts[genre] / total) * 100), color: colors[index % colors.length]
+    })).sort((a, b) => b.count - a.count);
   }
 
   function generatePieGradient(genreData) {
@@ -316,21 +392,19 @@ function App() {
     return `conic-gradient(${gradientParts.join(", ")})`;
   }
 
+  function calculatePercentage(current, total) {
+    const tot = parseInt(total) || 0;
+    if (tot <= 0) return 0;
+    const pct = Math.round((current / tot) * 100);
+    return pct > 100 ? 100 : pct;
+  }
+
+  // COMPONENTES AUXILIARES
   function Stars({ value, onChange }) {
     return (
       <div className="stars">
         {[1,2,3,4,5].map((n) => (
-          <span
-            key={n}
-            onClick={() => onChange && onChange(n)}
-            style={{
-              cursor: onChange ? "pointer" : "default",
-              fontSize: "20px",
-              color: n <= value ? "#ffd36e" : "#444"
-            }}
-          >
-            ★
-          </span>
+          <span key={n} onClick={() => onChange && onChange(n)} style={{ cursor: onChange ? "pointer" : "default", fontSize: "20px", color: n <= value ? "#ffd36e" : "#444" }}>★</span>
         ))}
       </div>
     );
@@ -376,49 +450,22 @@ function App() {
         <div className="auth-box">
           <h2>🌙 Arcana</h2>
           <p className="auth-subtitle">Sua biblioteca mística pessoal</p>
-          
           <form onSubmit={handleAuth} className="auth-form">
             <div className="input-group">
               <label>E-mail mágico</label>
               <input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="bruxinha@arcana.com" required />
             </div>
-
             <div className="input-group">
               <label>Palavra-passe (Senha)</label>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  value={authPassword} 
-                  onChange={(e) => setAuthPassword(e.target.value)} 
-                  placeholder="••••••••" 
-                  style={{ width: '100%', paddingRight: '40px' }}
-                  required 
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute', right: '10px', background: 'none', border: 'none', color: 'var(--gold-soft)', cursor: 'pointer', fontSize: '16px'
-                  }}
-                >
-                  {showPassword ? "👁️‍🗨️" : "👁️"}
-                </button>
+                <input type={showPassword ? "text" : "password"} value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="••••••••" style={{ width: '100%', paddingRight: '40px' }} required />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '10px', background: 'none', border: 'none', color: 'var(--gold-soft)', cursor: 'pointer', fontSize: '16px' }}>{showPassword ? "👁️‍🗨️" : "👁️"}</button>
               </div>
             </div>
-
             {authError && <p className="auth-error-msg">⚠️ {authError}</p>}
-
-            <button type="submit" className="btn-auth-submit">
-              {isSignUp ? "Criar Grimório de Conta" : "Desbloquear Biblioteca 🔮"}
-            </button>
+            <button type="submit" className="btn-auth-submit">{isSignUp ? "Criar Grimório de Conta" : "Desbloquear Biblioteca 🔮"}</button>
           </form>
-
-          <p className="auth-toggle-text">
-            {isSignUp ? "Já possui chaves?" : "Novo neste círculo místico?"}{" "}
-            <span onClick={() => { setIsSignUp(!isSignUp); setAuthError(""); setShowPassword(false); }}>
-              {isSignUp ? "Fazer Login" : "Criar uma Conta"}
-            </span>
-          </p>
+          <p className="auth-toggle-text">{isSignUp ? "Já possui chaves?" : "Novo neste círculo místico?"} <span onClick={() => { setIsSignUp(!isSignUp); setAuthError(""); setShowPassword(false); }}>{isSignUp ? "Fazer Login" : "Criar uma Conta"}</span></p>
         </div>
       </div>
     );
@@ -433,27 +480,38 @@ function App() {
 
       const genreData = getGenreData();
       const pieGradient = generatePieGradient(genreData);
+      
+      // Estatísticas temporais reais computadas
+      const { dayTotal, weekTotal, monthTotal } = getStatsByPeriod();
+
+      // Pega o primeiro livro "Lendo" para a seção em destaque
+      const currentBookFeatured = lendoAgora[0];
+      const currentPct = currentBookFeatured ? calculatePercentage(currentBookFeatured.current_page, currentBookFeatured.pages) : 0;
 
       return (
         <>
           {booksLoading && <p style={{ color: "var(--gold)", textAlign: "center" }}>Buscando seus feitiços na nuvem...</p>}
           
           <section className="dashboard-counters">
-            <div className="counter-card total">
-              <span className="counter-icon">📚</span>
-              <div className="counter-info"><p>LIVROS NO TOTAL</p><h3>{totalLivros}</h3></div>
+            <div className="counter-card total"><span className="counter-icon">📚</span><div className="counter-info"><p>LIVROS NO TOTAL</p><h3>{totalLivros}</h3></div></div>
+            <div className="counter-card lendo"><span className="counter-icon">📖</span><div className="counter-info"><p>LIVROS LENDO</p><h3>{lendoAgora.length}</h3></div></div>
+            <div className="counter-card lidos"><span className="counter-icon">📘</span><div className="counter-info"><p>LIVROS LIDOS</p><h3>{totalLidos}</h3></div></div>
+            <div className="counter-card nao-lidos"><span className="counter-icon">🌙</span><div className="counter-info"><p>LIVROS NÃO LIDOS</p><h3>{totalQuero}</h3></div></div>
+          </section>
+
+          {/* NOVO PAINEL DE REGISTRO DIÁRIO DE PÁGINAS */}
+          <section className="dashboard-counters" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginTop: '0px', background: 'rgba(28,18,40,0.4)', padding: '15px', borderRadius: '18px', border: '1px solid rgba(214,180,125,0.08)' }}>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '11px', color: 'var(--gold)', letterSpacing: '1px', margin: 0 }}>LIDO HOJE</p>
+              <h3 style={{ color: '#62ffb0', margin: '5px 0 0 0', fontFamily: 'Cinzel, serif' }}>{dayTotal} pág.</h3>
             </div>
-            <div className="counter-card lendo">
-              <span className="counter-icon">📖</span>
-              <div className="counter-info"><p>LIVROS LENDO</p><h3>{lendoAgora.length}</h3></div>
+            <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(214,180,125,0.1)', borderRight: '1px solid rgba(214,180,125,0.1)' }}>
+              <p style={{ fontSize: '11px', color: 'var(--gold)', letterSpacing: '1px', margin: 0 }}>ESTA SEMANA</p>
+              <h3 style={{ color: 'var(--gold-soft)', margin: '5px 0 0 0', fontFamily: 'Cinzel, serif' }}>{weekTotal} pág.</h3>
             </div>
-            <div className="counter-card lidos">
-              <span className="counter-icon">📘</span>
-              <div className="counter-info"><p>LIVROS LIDOS</p><h3>{totalLidos}</h3></div>
-            </div>
-            <div className="counter-card nao-lidos">
-              <span className="counter-icon">🌙</span>
-              <div className="counter-info"><p>LIVROS NÃO LIDOS</p><h3>{totalQuero}</h3></div>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '11px', color: 'var(--gold)', letterSpacing: '1px', margin: 0 }}>ESTE MÊS</p>
+              <h3 style={{ color: '#8c62ff', margin: '5px 0 0 0', fontFamily: 'Cinzel, serif' }}>{monthTotal} pág.</h3>
             </div>
           </section>
 
@@ -461,9 +519,7 @@ function App() {
             <div className="genres-box">
               <h3>GÊNEROS LIDOS ✨</h3>
               <div className="genres-content">
-                <div className="pie-chart-mock" style={{ background: pieGradient }}>
-                  <div className="inner-circle">🔮</div>
-                </div>
+                <div className="pie-chart-mock" style={{ background: pieGradient }}><div className="inner-circle">🔮</div></div>
                 <ul className="genres-list">
                   {genreData.length > 0 ? (
                     genreData.map((genre, idx) => (
@@ -494,14 +550,16 @@ function App() {
           <section className="dashboard-lower">
             <div className="current-reading-section">
               <h3>LENDO AGORA ✨</h3>
-              {lendoAgora.length > 0 ? (
-                <div className="current-book-display" onClick={() => handleCardClick(lendoAgora[0])} style={{ cursor: 'pointer' }}>
-                  <img src={lendoAgora[0].cover || "https://via.placeholder.com/120x180"} alt="Capa" />
+              {currentBookFeatured ? (
+                <div className="current-book-display" onClick={() => handleCardClick(currentBookFeatured)} style={{ cursor: 'pointer' }}>
+                  <img src={currentBookFeatured.cover || "https://via.placeholder.com/120x180"} alt="Capa" />
                   <div className="current-book-details">
-                    <h4>{lendoAgora[0].title}</h4>
-                    <p>{lendoAgora[0].author}</p>
-                    <div className="progress-container"><div className="progress-bar" style={{ width: '58%' }}></div></div>
-                    <span className="progress-text">58% concluído</span>
+                    <h4>{currentBookFeatured.title}</h4>
+                    <p>{currentBookFeatured.author}</p>
+                    <div className="progress-container">
+                      <div className="progress-bar" style={{ width: `${currentPct}%` }}></div>
+                    </div>
+                    <span className="progress-text">{currentPct}% concluído ({currentBookFeatured.current_page}/{currentBookFeatured.pages || "?"} pág)</span>
                   </div>
                 </div>
               ) : (
@@ -526,9 +584,7 @@ function App() {
           </section>
 
           <section className="books shelf-section">
-            <div className="shelf-header">
-              <h2>MEU ACERVO ✦</h2>
-            </div>
+            <div className="shelf-header"><h2>MEU ACERVO ✦</h2></div>
             <div className="netflix-row">
               {books.length > 0 ? books.map(Card) : <p className="empty-text">Seu acervo místico está vazio. Comece a criar feitiços!</p>}
             </div>
@@ -558,7 +614,6 @@ function App() {
         <button onClick={() => setPage("leituras")}>📚 Leituras</button>
         <button onClick={() => setPage("wishlist")}>⭐ Wishlist</button>
         
-        {/* Nova opção de alterar a senha no Painel */}
         <button onClick={() => { setOpenPasswordModal(true); setPasswordStatusMsg(""); }} className="btn-change-pass-sidebar" style={{ marginTop: 'auto', background: 'rgba(214,180,125,0.05)', border: '1px dashed rgba(214,180,125,0.2)' }}>
           🔑 Alterar Senha
         </button>
@@ -584,25 +639,10 @@ function App() {
             <p style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '15px' }}>Digite seu novo segredo de acesso abaixo:</p>
             <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <input 
-                  type={passwordTargetShow ? "text" : "password"} 
-                  placeholder="Mínimo 6 dígitos" 
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  style={{ width: '100%', paddingRight: '40px' }}
-                  required
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setPasswordTargetShow(!passwordTargetShow)}
-                  style={{ position: 'absolute', right: '10px', background: 'none', border: 'none', color: 'var(--gold-soft)', cursor: 'pointer' }}
-                >
-                  {passwordTargetShow ? "👁️‍🗨️" : "👁️"}
-                </button>
+                <input type={passwordTargetShow ? "text" : "password"} placeholder="Mínimo 6 dígitos" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} style={{ width: '100%', paddingRight: '40px' }} required />
+                <button type="button" onClick={() => setPasswordTargetShow(!passwordTargetShow)} style={{ position: 'absolute', right: '10px', background: 'none', border: 'none', color: 'var(--gold-soft)', cursor: 'pointer' }}>{passwordTargetShow ? "👁️‍🗨️" : "👁️"}</button>
               </div>
-
               {passwordStatusMsg && <p style={{ fontSize: '13px', color: passwordStatusMsg.includes('sucesso') ? '#62ffb0' : '#ff6b6b', textAlign: 'center', margin: 0 }}>{passwordStatusMsg}</p>}
-
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button type="submit" style={{ flex: 1 }}>Atualizar</button>
                 <button type="button" onClick={() => setOpenPasswordModal(false)} style={{ background: '#444' }}>Cancelar</button>
@@ -612,7 +652,7 @@ function App() {
         </div>
       )}
 
-      {/* POP-UP DETALHES */}
+      {/* POP-UP DETALHES + ATUALIZADOR DIÁRIO DE LEITURA */}
       {selectedBook && (
         <div className="modal-overlay" onClick={() => setSelectedBook(null)}>
           <div className="modal book-preview-modal" onClick={(e) => e.stopPropagation()}>
@@ -624,12 +664,42 @@ function App() {
                   {selectedBook.genre && <span className="tag-genre">🔮 {selectedBook.genre}</span>}
                   {selectedBook.pages && <span className="tag-pages">📄 {selectedBook.pages} pág.</span>}
                 </div>
+
+                {/* ATUALIZAR PROGRESOS DIRETO NO CARD */}
+                {selectedBook.status === "lendo" && (
+                  <div style={{ marginTop: '20px', background: 'rgba(214,180,125,0.04)', padding: '15px', borderRadius: '14px', border: '1px dashed rgba(214,180,125,0.2)' }}>
+                    <h5 style={{ margin: '0 0 10px 0', color: 'var(--gold)', fontSize: '12px', letterSpacing: '0.5px' }}>📈 REGISTRAR DIÁRIO</h5>
+                    <form onSubmit={handleUpdateProgress} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--muted)' }}>Pág. Atual:</span>
+                        <input 
+                          type="number" 
+                          placeholder={selectedBook.current_page} 
+                          value={inputPageUpdate}
+                          onChange={(e) => setInputPageUpdate(e.target.value)}
+                          style={{ padding: '6px', fontSize: '13px', flex: 1, textAlign: 'center' }}
+                        />
+                      </div>
+                      <button type="submit" style={{ padding: '8px', fontSize: '12px', background: 'linear-gradient(135deg, #8c62ff, #62ffb0)', color: '#0c0814', fontWeight: 'bold' }}>
+                        Salvar Páginas
+                      </button>
+                    </form>
+                    {logStatusMsg && <p style={{ fontSize: '11px', color: logStatusMsg.includes('salvo') ? '#62ffb0' : '#ff6b6b', margin: '5px 0 0 0', textAlign: 'center' }}>{logStatusMsg}</p>}
+                  </div>
+                )}
               </div>
+              
               <div className="preview-right">
                 <span className="preview-status-badge">{selectedBook.status.toUpperCase()}</span>
                 <h2>{selectedBook.title}</h2>
                 <p className="preview-author">por {selectedBook.author}</p>
                 <div className="preview-rating"><Stars value={selectedBook.rating} /></div>
+                
+                {/* Porcentagem dinâmica no detalhe */}
+                <p className="preview-detail-text">
+                  <strong>Progresso Real:</strong> {calculatePercentage(selectedBook.current_page, selectedBook.pages)}% concluído ({selectedBook.current_page} de {selectedBook.pages || "?"} pág.)
+                </p>
+
                 {selectedBook.publisher && <p className="preview-detail-text"><strong>Editora:</strong> {selectedBook.publisher}</p>}
                 {(selectedBook.startDate || selectedBook.endDate) && (
                   <p className="preview-detail-text"><strong>Período:</strong> {selectedBook.startDate || "??"} até {selectedBook.endDate || "??"}</p>
@@ -659,7 +729,8 @@ function App() {
             <input placeholder="Autor" value={form.author} onChange={(e)=>setForm({...form,author:e.target.value})}/>
             <input placeholder="Editora" value={form.publisher} onChange={(e)=>setForm({...form,publisher:e.target.value})}/>
             <input placeholder="Gênero" value={form.genre} onChange={(e)=>setForm({...form,genre:e.target.value})}/>
-            <input placeholder="Páginas" value={form.pages} onChange={(e)=>setForm({...form,pages:e.target.value})}/>
+            <input placeholder="Total de Páginas" type="number" value={form.pages} onChange={(e)=>setForm({...form,pages:e.target.value})}/>
+            <input placeholder="Página Atual inicial" type="number" value={form.current_page} onChange={(e)=>setForm({...form,current_page:parseInt(e.target.value)||0})}/>
             <p>Classificação</p>
             <Stars value={form.rating} onChange={(n)=>setForm({...form,rating:n})}/>
             <input type="date" value={form.startDate || ""} onChange={(e)=>setForm({...form,startDate:e.target.value})}/>
