@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 
@@ -32,11 +33,13 @@ function App() {
   const [selectedBook, setSelectedBook] = useState(null); 
 
   // =========================
-  // RASTREAMENTO & LOGS STATE
+  // RASTREAMENTO & METAS
   // =========================
   const [readingLogs, setReadingLogs] = useState([]);
   const [inputPageUpdate, setInputPageUpdate] = useState("");
   const [logStatusMsg, setLogStatusMsg] = useState("");
+  const [readingGoal, setReadingGoal] = useState(1000); 
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date()); 
 
   // =========================
   // FORM STATE
@@ -180,7 +183,7 @@ function App() {
       cover: form.cover,
       summary: form.summary,
       status: form.status,
-      current_page: form.current_page || 0
+      current_page: parseInt(form.current_page) || 0
     };
 
     if (editingId) {
@@ -190,7 +193,12 @@ function App() {
         .eq("id", editingId);
 
       if (!error) {
-        const updatedLocal = { ...form, genre: formattedGenre, id: editingId, current_page: form.current_page || 0 };
+        const updatedLocal = { 
+          ...form, 
+          genre: formattedGenre, 
+          id: editingId, 
+          current_page: parseInt(form.current_page) || 0 
+        };
         setBooks(books.map((b) => (b.id === editingId ? updatedLocal : b)));
         if (selectedBook && selectedBook.id === editingId) {
           setSelectedBook(updatedLocal);
@@ -203,7 +211,12 @@ function App() {
         .select();
 
       if (!error && data) {
-        const created = { ...data[0], startDate: data[0].start_date, endDate: data[0].end_date, current_page: data[0].current_page || 0 };
+        const created = { 
+          ...data[0], 
+          startDate: data[0].start_date, 
+          endDate: data[0].end_date, 
+          current_page: data[0].current_page || 0 
+        };
         setBooks([created, ...books]);
       }
     }
@@ -231,14 +244,12 @@ function App() {
 
     const pagesJustRead = targetPage - selectedBook.current_page;
 
-    // Atualiza a página atual do livro no banco
     const { error: bookError } = await supabase
       .from("books")
       .update({ current_page: targetPage })
       .eq("id", selectedBook.id);
 
     if (!bookError) {
-      // Se ele leu páginas a mais, registra um Log Diário
       if (pagesJustRead > 0) {
         await supabase.from("reading_logs").insert([
           { user_id: user.id, book_id: selectedBook.id, pages_read: pagesJustRead }
@@ -246,7 +257,6 @@ function App() {
         fetchLogs();
       }
 
-      // Atualiza os estados locais
       const updatedBook = { ...selectedBook, current_page: targetPage };
       setBooks(books.map(b => b.id === selectedBook.id ? updatedBook : b));
       setSelectedBook(updatedBook);
@@ -319,7 +329,21 @@ function App() {
   }
 
   function handleEditFromPreview() {
-    setForm(selectedBook);
+    setForm({
+      title: selectedBook.title || "",
+      author: selectedBook.author || "",
+      publisher: selectedBook.publisher || "",
+      rating: selectedBook.rating || 0,
+      favorite: selectedBook.favorite || false,
+      pages: selectedBook.pages || "",
+      startDate: selectedBook.startDate || selectedBook.start_date || "",
+      endDate: selectedBook.endDate || selectedBook.end_date || "",
+      genre: selectedBook.genre || "",
+      cover: selectedBook.cover || "",
+      summary: selectedBook.summary || "",
+      status: selectedBook.status || "quero",
+      current_page: selectedBook.current_page || 0
+    });
     setEditingId(selectedBook.id);
     setSelectedBook(null); 
     setOpenModal(true); 
@@ -347,15 +371,12 @@ function App() {
       const diffTime = Math.abs(now - logDate);
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      // Hoje
       if (logDate.toDateString() === now.toDateString()) {
         dayTotal += log.pages_read;
       }
-      // Últimos 7 dias
       if (diffDays <= 7) {
         weekTotal += log.pages_read;
       }
-      // Últimos 30 dias
       if (diffDays <= 30) {
         monthTotal += log.pages_read;
       }
@@ -459,7 +480,7 @@ function App() {
               <label>Palavra-passe (Senha)</label>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <input type={showPassword ? "text" : "password"} value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="••••••••" style={{ width: '100%', paddingRight: '40px' }} required />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '10px', background: 'none', border: 'none', color: 'var(--gold-soft)', cursor: 'pointer', fontSize: '16px' }}>{showPassword ? "👁️‍🗨️" : "👁️"}</button>
+                <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '10px', background: 'none', border: 'none', color: 'var(--gold-soft)', cursor: 'pointer', fontSize: '16px' }}>{showPassword ? "👁️‍🗨️" : "👁"}</button>
               </div>
             </div>
             {authError && <p className="auth-error-msg">⚠️ {authError}</p>}
@@ -481,10 +502,8 @@ function App() {
       const genreData = getGenreData();
       const pieGradient = generatePieGradient(genreData);
       
-      // Estatísticas temporais reais computadas
       const { dayTotal, weekTotal, monthTotal } = getStatsByPeriod();
 
-      // Pega o primeiro livro "Lendo" para a seção em destaque
       const currentBookFeatured = lendoAgora[0];
       const currentPct = currentBookFeatured ? calculatePercentage(currentBookFeatured.current_page, currentBookFeatured.pages) : 0;
 
@@ -499,7 +518,6 @@ function App() {
             <div className="counter-card nao-lidos"><span className="counter-icon">🌙</span><div className="counter-info"><p>LIVROS NÃO LIDOS</p><h3>{totalQuero}</h3></div></div>
           </section>
 
-          {/* NOVO PAINEL DE REGISTRO DIÁRIO DE PÁGINAS */}
           <section className="dashboard-counters" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginTop: '0px', background: 'rgba(28,18,40,0.4)', padding: '15px', borderRadius: '18px', border: '1px solid rgba(214,180,125,0.08)' }}>
             <div style={{ textAlign: 'center' }}>
               <p style={{ fontSize: '11px', color: 'var(--gold)', letterSpacing: '1px', margin: 0 }}>LIDO HOJE</p>
@@ -595,6 +613,207 @@ function App() {
       );
     }
 
+    // =========================================
+    // NOVA PÁGINA: REGISTRO DE LEITURAS (IMAGEM)
+    // =========================================
+    if (page === "registro_leituras") {
+      const lendoAgora = byStatus("lendo");
+      const livroAtual = lendoAgora[0];
+
+      const logsDoMes = readingLogs.filter(log => {
+        const logDate = new Date(log.logged_at);
+        return logDate.getMonth() === currentCalendarDate.getMonth() && 
+               logDate.getFullYear() === currentCalendarDate.getFullYear();
+      });
+
+      const paginasLidasNoMes = logsDoMes.reduce((acc, log) => acc + log.pages_read, 0);
+      
+      const diasUnicos = new Set(logsDoMes.map(log => new Date(log.logged_at).toDateString()));
+      const totalDiasLidos = diasUnicos.size;
+      
+      const mediaPorDia = totalDiasLidos > 0 ? Math.round(paginasLidasNoMes / totalDiasLidos) : 0;
+
+      const ano = currentCalendarDate.getFullYear();
+      const mes = currentCalendarDate.getMonth();
+      const nomeMeses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+      
+      const primeiroDiaDoMes = new Date(ano, mes, 1).getDay();
+      const totalDiasNoMes = new Date(ano, mes + 1, 0).getDate();
+      
+      const diasCalendario = [];
+      for (let i = 0; i < primeiroDiaDoMes; i++) {
+        diasCalendario.push(null);
+      }
+      for (let d = 1; d <= totalDiasNoMes; d++) {
+        diasCalendario.push(new Date(ano, mes, d));
+      }
+
+      return (
+        <div className="registro-leituras-page">
+          {/* HEADER DA PÁGINA */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div>
+              <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)' }}>Registro de Leituras ✦</h2>
+              <p style={{ color: 'var(--muted)', fontSize: '14px' }}>Acompanhe cada página da sua jornada.</p>
+            </div>
+            <button onClick={() => { resetForm(); setOpenModal(true); }} className="btn-add-magic">
+              + Registrar leitura
+            </button>
+          </div>
+
+          {/* GRID SUPERIOR: CALENDÁRIO E RESUMO */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px', marginBottom: '20px' }}>
+            
+            {/* CARD DO CALENDÁRIO */}
+            <div className="card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', alignItems: 'center' }}>
+                <button onClick={() => setCurrentCalendarDate(new Date(ano, mes - 1, 1))} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer' }}>◀</button>
+                <h3 style={{ fontFamily: 'Cinzel, serif', margin: 0 }}>{nomeMeses[mes]} de {ano}</h3>
+                <button onClick={() => setCurrentCalendarDate(new Date(ano, mes + 1, 1))} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer' }}>▶</button>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', fontWeight: 'bold', fontSize: '12px', color: 'var(--gold-soft)', marginBottom: '10px' }}>
+                <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: '12px', textAlign: 'center' }}>
+                {diasCalendario.map((dataDia, index) => {
+                  if (!dataDia) return <div key={index}></div>;
+                  
+                  const leuNesseDia = readingLogs.some(log => new Date(log.logged_at).toDateString() === dataDia.toDateString());
+                  
+                  return (
+                    <div key={index} style={{ position: 'relative', padding: '5px 0', fontSize: '14px' }}>
+                      <span>{dataDia.getDate()}</span>
+                      {leuNesseDia && (
+                        <span style={{ position: 'absolute', bottom: '1px', left: '50%', transform: 'translateX(-50%)', width: '5px', height: '5px', backgroundColor: '#ffd36e', borderRadius: '50%' }}></span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* CARD RESUMO DO MÊS */}
+            <div className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center', gap: '15px' }}>
+              <div>
+                <p style={{ fontSize: '12px', color: 'var(--muted)', margin: 0 }}>DIAS LIDOS</p>
+                <h2 style={{ fontFamily: 'Cinzel, serif', color: '#62ffb0', margin: '5px 0' }}>{totalDiasLidos} <span style={{ fontSize: '14px' }}>dias</span></h2>
+              </div>
+              <div style={{ borderTop: '1px solid rgba(214,180,125,0.1)', borderBottom: '1px solid rgba(214,180,125,0.1)', padding: '10px 0' }}>
+                <p style={{ fontSize: '12px', color: 'var(--muted)', margin: 0 }}>PÁGINAS LIDAS</p>
+                <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)', margin: '5px 0' }}>{paginasLidasNoMes.toLocaleString()} <span style={{ fontSize: '14px' }}>páginas</span></h2>
+              </div>
+              <div>
+                <p style={{ fontSize: '12px', color: 'var(--muted)', margin: 0 }}>MÉDIA POR DIA</p>
+                <h2 style={{ fontFamily: 'Cinzel, serif', color: '#8c62ff', margin: '5px 0' }}>{mediaPorDia} <span style={{ fontSize: '14px' }}>páginas</span></h2>
+              </div>
+            </div>
+          </div>
+
+          {/* GRID INFERIOR: HISTÓRICO, ATUAL E META */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 0.7fr', gap: '20px' }}>
+            
+            {/* TABELA DE HISTÓRICO DE LEITURAS */}
+            <div className="card" style={{ padding: '20px' }}>
+              <h3 style={{ fontFamily: 'Cinzel, serif', marginBottom: '15px' }}>Histórico de Leituras ✍️</h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(214,180,125,0.2)', color: 'var(--gold-soft)' }}>
+                      <th style={{ padding: '10px 5px' }}>DATA</th>
+                      <th style={{ padding: '10px 5px' }}>LIVRO</th>
+                      <th style={{ padding: '10px 5px' }}>PÁGINAS LIDAS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logsDoMes.length > 0 ? (
+                      logsDoMes.map((log) => {
+                        const livroRelacionado = books.find(b => b.id === log.book_id);
+                        return (
+                          <tr key={log.id} style={{ borderBottom: '1px solid rgba(214,180,125,0.05)' }}>
+                            <td style={{ padding: '10px 5px', color: 'var(--muted)' }}>
+                              {new Date(log.logged_at).toLocaleDateString('pt-BR')}
+                            </td>
+                            <td style={{ padding: '10px 5px', fontWeight: 'bold' }}>
+                              {livroRelacionado ? livroRelacionado.title : "Livro Desconhecido"}
+                            </td>
+                            <td style={{ padding: '10px 5px', color: '#62ffb0' }}>
+                              +{log.pages_read} pág.
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan="3" style={{ padding: '20px 0', textAlign: 'center', color: 'var(--muted)' }}>
+                          Nenhum registro de leitura lançado este mês.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* COLUNA DA DIREITA: LIVRO ATUAL E META DE LEITURA */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              
+              {/* CARD LEITURA ATUAL */}
+              <div className="card" style={{ padding: '20px' }}>
+                <h4 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold-soft)', marginBottom: '15px' }}>LEITURA ATUAL</h4>
+                {livroAtual ? (
+                  <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                    <img src={livroAtual.cover || "https://via.placeholder.com/70x105"} alt="Capa" style={{ width: '70px', borderRadius: '6px', border: '1px solid rgba(214,180,125,0.2)' }} />
+                    <div style={{ flex: 1 }}>
+                      <h4 style={{ margin: '0 0 5px 0', fontSize: '15px' }}>{livroAtual.title}</h4>
+                      <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)' }}>{livroAtual.author}</p>
+                      <div className="progress-container" style={{ margin: '10px 0 5px 0', height: '6px' }}>
+                        <div className="progress-bar" style={{ width: `${calculatePercentage(livroAtual.current_page, livroAtual.pages)}%` }}></div>
+                      </div>
+                      <span style={{ fontSize: '11px', color: 'var(--gold-soft)' }}>
+                        {calculatePercentage(livroAtual.current_page, livroAtual.pages)}% concluído
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--muted)', fontSize: '13px', margin: 0 }}>Nenhum grimório sendo lido ativamente.</p>
+                )}
+              </div>
+
+              {/* CARD META DE LEITURA */}
+              <div className="card" style={{ padding: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <h4 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold-soft)', margin: 0 }}>META DE LEITURA ✨</h4>
+                  <input 
+                    type="number" 
+                    value={readingGoal} 
+                    onChange={(e) => setReadingGoal(parseInt(e.target.value) || 0)}
+                    style={{ width: '70px', padding: '4px', fontSize: '12px', textAlign: 'center', background: '#1c1228', border: '1px solid rgba(214,180,125,0.3)', color: '#fff' }}
+                  />
+                </div>
+                <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '0 0 10px 0' }}>Ler {readingGoal} páginas este mês</p>
+                
+                <div className="progress-container" style={{ height: '8px', marginBottom: '5px' }}>
+                  <div className="progress-bar" style={{ width: `${Math.min(calculatePercentage(paginasLidasNoMes, readingGoal), 100)}%`, background: 'linear-gradient(90deg, #8c62ff, #62ffb0)' }}></div>
+                </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                  <span>{paginasLidasNoMes} / {readingGoal} pág.</span>
+                  {paginasLidasNoMes >= readingGoal ? (
+                    <span style={{ color: '#62ffb0', fontWeight: 'bold' }}>Meta concluída! 🔮</span>
+                  ) : (
+                    <span style={{ color: 'var(--muted)' }}>{calculatePercentage(paginasLidasNoMes, readingGoal)}%</span>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     if (page === "wishlist") {
       return (
         <section className="books shelf-section">
@@ -611,8 +830,9 @@ function App() {
       <aside className="sidebar">
         <h2>🌙 Arcana</h2>
         <div className="user-badge-profile">✨ {user.email.split('@')[0]}</div>
-        <button onClick={() => setPage("leituras")}>📚 Leituras</button>
-        <button onClick={() => setPage("wishlist")}>⭐ Wishlist</button>
+        <button onClick={() => setPage("leituras")} style={{ fontWeight: page === "leituras" ? "bold" : "normal" }}>📚 Painel Geral</button>
+        <button onClick={() => setPage("registro_leituras")} style={{ fontWeight: page === "registro_leituras" ? "bold" : "normal" }}>✨ Registro de Leituras</button>
+        <button onClick={() => setPage("wishlist")} style={{ fontWeight: page === "wishlist" ? "bold" : "normal" }}>⭐ Wishlist</button>
         
         <button onClick={() => { setOpenPasswordModal(true); setPasswordStatusMsg(""); }} className="btn-change-pass-sidebar" style={{ marginTop: 'auto', background: 'rgba(214,180,125,0.05)', border: '1px dashed rgba(214,180,125,0.2)' }}>
           🔑 Alterar Senha
@@ -665,7 +885,6 @@ function App() {
                   {selectedBook.pages && <span className="tag-pages">📄 {selectedBook.pages} pág.</span>}
                 </div>
 
-                {/* ATUALIZAR PROGRESOS DIRETO NO CARD */}
                 {selectedBook.status === "lendo" && (
                   <div style={{ marginTop: '20px', background: 'rgba(214,180,125,0.04)', padding: '15px', borderRadius: '14px', border: '1px dashed rgba(214,180,125,0.2)' }}>
                     <h5 style={{ margin: '0 0 10px 0', color: 'var(--gold)', fontSize: '12px', letterSpacing: '0.5px' }}>📈 REGISTRAR DIÁRIO</h5>
@@ -695,7 +914,6 @@ function App() {
                 <p className="preview-author">por {selectedBook.author}</p>
                 <div className="preview-rating"><Stars value={selectedBook.rating} /></div>
                 
-                {/* Porcentagem dinâmica no detalhe */}
                 <p className="preview-detail-text">
                   <strong>Progresso Real:</strong> {calculatePercentage(selectedBook.current_page, selectedBook.pages)}% concluído ({selectedBook.current_page} de {selectedBook.pages || "?"} pág.)
                 </p>
