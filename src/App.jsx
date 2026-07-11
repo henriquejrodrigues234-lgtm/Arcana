@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 
@@ -41,23 +40,46 @@ function App() {
   const [readingGoal, setReadingGoal] = useState(1000); 
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date()); 
 
+  const [openLogModal, setOpenLogModal] = useState(false);
+  const [logForm, setLogForm] = useState({
+    book_id: "",
+    pages_read: "",
+    logged_at: new Date().toISOString().split('T')[0]
+  });
+  const [quickLogMsg, setQuickLogMsg] = useState("");
+
   // =========================
-  // FORM STATE
+  // FORM STATE (LIVROS)
   // =========================
   const [form, setForm] = useState({
+    title: "", author: "", publisher: "", rating: 0, favorite: false,
+    pages: "", startDate: "", endDate: "", genre: "", cover: "", summary: "",
+    status: "quero", current_page: 0
+  });
+
+  // =========================
+  // STATE DA WISHLIST
+  // =========================
+  const [wishlistItems, setWishlistItems] = useState([]);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [openWishlistModal, setOpenWishlistModal] = useState(false);
+  const [editingWishlistId, setEditingWishlistId] = useState(null);
+
+  // Filtros e buscas da Wishlist
+  const [wishlistSort, setWishlistSort] = useState("prioridade"); // prioridade, menor_preco, maior_preco
+  const [wishlistFilterStatus, setWishlistFilterStatus] = useState("todos"); // todos, quero, comprado
+  const [wishlistSearch, setWishlistSearch] = useState("");
+
+  // Form da Wishlist (Baseado no Pop-up da foto)
+  const [wishlistForm, setWishlistForm] = useState({
     title: "",
     author: "",
-    publisher: "",
-    rating: 0,
-    favorite: false,
-    pages: "",
-    startDate: "",
-    endDate: "",
-    genre: "",
-    cover: "",
-    summary: "",
+    priority: "Média",
+    price: "",
+    buy_url: "",
     status: "quero",
-    current_page: 0
+    notes: "",
+    cover: ""
   });
 
   useEffect(() => {
@@ -77,9 +99,11 @@ function App() {
     if (user) {
       fetchBooks();
       fetchLogs();
+      fetchWishlist();
     } else {
       setBooks([]);
       setReadingLogs([]);
+      setWishlistItems([]);
     }
   }, [user]);
 
@@ -92,17 +116,11 @@ function App() {
     if (!authEmail || !authPassword) return;
 
     if (isSignUp) {
-      const { error } = await supabase.auth.signUp({
-        email: authEmail,
-        password: authPassword,
-      });
+      const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword });
       if (error) setAuthError(error.message);
       else alert("Conta criada com sucesso! Boas-vindas ao Arcana.");
     } else {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: authEmail,
-        password: authPassword,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
       if (error) setAuthError(error.message);
     }
   }
@@ -119,7 +137,6 @@ function App() {
       setPasswordStatusMsg("⚠️ A senha precisa ter pelo menos 6 caracteres.");
       return;
     }
-
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) {
       setPasswordStatusMsg(`⚠️ Erro: ${error.message}`);
@@ -138,89 +155,43 @@ function App() {
   // =========================
   async function fetchBooks() {
     setBooksLoading(true);
-    const { data, error } = await supabase
-      .from("books")
-      .select("*")
-      .order("created_at", { ascending: false });
-
+    const { data, error } = await supabase.from("books").select("*").order("created_at", { ascending: false });
     if (!error && data) {
-      const formatted = data.map(b => ({
-        ...b,
-        startDate: b.start_date,
-        endDate: b.end_date,
-        current_page: b.current_page || 0
-      }));
-      setBooks(formatted);
+      setBooks(data.map(b => ({ ...b, startDate: b.start_date, endDate: b.end_date, current_page: b.current_page || 0 })));
     }
     setBooksLoading(false);
   }
 
   async function fetchLogs() {
-    const { data, error } = await supabase
-      .from("reading_logs")
-      .select("*")
-      .order("logged_at", { ascending: false });
+    const { data, error } = await supabase.from("reading_logs").select("*").order("logged_at", { ascending: false });
     if (!error && data) setReadingLogs(data);
   }
 
   async function saveBook() {
     if (!form.title || !form.author || !user) return;
-
     const formattedGenre = form.genre ? form.genre.trim() : "Outros";
     const totalPagesNum = parseInt(form.pages) || 0;
     
     const bookData = {
-      user_id: user.id,
-      title: form.title,
-      author: form.author,
-      publisher: form.publisher,
-      rating: form.rating,
-      favorite: form.favorite,
-      pages: totalPagesNum > 0 ? totalPagesNum.toString() : "",
-      start_date: form.startDate,
-      end_date: form.endDate,
-      genre: formattedGenre,
-      cover: form.cover,
-      summary: form.summary,
-      status: form.status,
+      user_id: user.id, title: form.title, author: form.author, publisher: form.publisher, rating: form.rating,
+      favorite: form.favorite, pages: totalPagesNum > 0 ? totalPagesNum.toString() : "", start_date: form.startDate,
+      end_date: form.endDate, genre: formattedGenre, cover: form.cover, summary: form.summary, status: form.status,
       current_page: parseInt(form.current_page) || 0
     };
 
     if (editingId) {
-      const { error } = await supabase
-        .from("books")
-        .update(bookData)
-        .eq("id", editingId);
-
+      const { error } = await supabase.from("books").update(bookData).eq("id", editingId);
       if (!error) {
-        const updatedLocal = { 
-          ...form, 
-          genre: formattedGenre, 
-          id: editingId, 
-          current_page: parseInt(form.current_page) || 0 
-        };
+        const updatedLocal = { ...form, genre: formattedGenre, id: editingId, current_page: parseInt(form.current_page) || 0 };
         setBooks(books.map((b) => (b.id === editingId ? updatedLocal : b)));
-        if (selectedBook && selectedBook.id === editingId) {
-          setSelectedBook(updatedLocal);
-        }
+        if (selectedBook && selectedBook.id === editingId) setSelectedBook(updatedLocal);
       }
     } else {
-      const { data, error } = await supabase
-        .from("books")
-        .insert([bookData])
-        .select();
-
+      const { data, error } = await supabase.from("books").insert([bookData]).select();
       if (!error && data) {
-        const created = { 
-          ...data[0], 
-          startDate: data[0].start_date, 
-          endDate: data[0].end_date, 
-          current_page: data[0].current_page || 0 
-        };
-        setBooks([created, ...books]);
+        setBooks([{ ...data[0], startDate: data[0].start_date, endDate: data[0].end_date, current_page: data[0].current_page || 0 }, ...books]);
       }
     }
-
     resetForm();
     setOpenModal(false);
   }
@@ -233,37 +204,62 @@ function App() {
     const targetPage = parseInt(inputPageUpdate);
     const totalPages = parseInt(selectedBook.pages) || 0;
 
-    if (isNaN(targetPage) || targetPage < 0) {
+    if (isNaN(targetPage) || targetPage < 0 || (totalPages > 0 && targetPage > totalPages)) {
       setLogStatusMsg("⚠️ Insira uma página válida.");
-      return;
-    }
-    if (totalPages > 0 && targetPage > totalPages) {
-      setLogStatusMsg(`⚠️ A página não pode ser maior que o total (${totalPages}).`);
       return;
     }
 
     const pagesJustRead = targetPage - selectedBook.current_page;
-
-    const { error: bookError } = await supabase
-      .from("books")
-      .update({ current_page: targetPage })
-      .eq("id", selectedBook.id);
+    const { error: bookError } = await supabase.from("books").update({ current_page: targetPage }).eq("id", selectedBook.id);
 
     if (!bookError) {
       if (pagesJustRead > 0) {
-        await supabase.from("reading_logs").insert([
-          { user_id: user.id, book_id: selectedBook.id, pages_read: pagesJustRead }
-        ]);
+        await supabase.from("reading_logs").insert([{ user_id: user.id, book_id: selectedBook.id, pages_read: pagesJustRead }]);
         fetchLogs();
       }
-
       const updatedBook = { ...selectedBook, current_page: targetPage };
       setBooks(books.map(b => b.id === selectedBook.id ? updatedBook : b));
       setSelectedBook(updatedBook);
       setInputPageUpdate("");
       setLogStatusMsg("🔮 Progresso salvo e log registrado!");
-    } else {
-      setLogStatusMsg("⚠️ Falha ao salvar progresso.");
+    }
+  }
+
+  async function handleSaveQuickLog(e) {
+    e.preventDefault();
+    setQuickLogMsg("");
+    const targetBookId = logForm.book_id;
+    const pagesReadNum = parseInt(logForm.pages_read);
+
+    if (!targetBookId || isNaN(pagesReadNum) || pagesReadNum <= 0) {
+      setQuickLogMsg("⚠️ Dados inválidos.");
+      return;
+    }
+
+    const selectedTargetBook = books.find(b => b.id === targetBookId);
+    if (!selectedTargetBook) return;
+
+    const nextPagesTotal = (selectedTargetBook.current_page || 0) + pagesReadNum;
+    const totalBookPages = parseInt(selectedTargetBook.pages) || 0;
+
+    if (totalBookPages > 0 && nextPagesTotal > totalBookPages) {
+      setQuickLogMsg(`⚠️ Ultrapassa as ${totalBookPages} páginas totais.`);
+      return;
+    }
+
+    const { error: logError } = await supabase.from("reading_logs").insert([
+      { user_id: user.id, book_id: targetBookId, pages_read: pagesReadNum, logged_at: new Date(logForm.logged_at + "T12:00:00").toISOString() }
+    ]);
+
+    if (!logError) {
+      await supabase.from("books").update({ current_page: nextPagesTotal }).eq("id", targetBookId);
+      setBooks(books.map(b => b.id === targetBookId ? { ...b, current_page: nextPagesTotal } : b));
+      fetchLogs();
+      setQuickLogMsg("🔮 Páginas integradas!");
+      setTimeout(() => {
+        setOpenLogModal(false);
+        setLogForm({ book_id: "", pages_read: "", logged_at: new Date().toISOString().split('T')[0] });
+      }, 1500);
     }
   }
 
@@ -280,15 +276,11 @@ function App() {
     if (e) e.stopPropagation();
     const currentBook = books.find(b => b.id === id);
     if (!currentBook) return;
-
     const nextFavoriteState = !currentBook.favorite;
     const { error } = await supabase.from("books").update({ favorite: nextFavoriteState }).eq("id", id);
-
     if (!error) {
       setBooks(books.map((b) => b.id === id ? { ...b, favorite: nextFavoriteState } : b));
-      if (selectedBook && selectedBook.id === id) {
-        setSelectedBook({ ...selectedBook, favorite: nextFavoriteState });
-      }
+      if (selectedBook && selectedBook.id === id) setSelectedBook({ ...selectedBook, favorite: nextFavoriteState });
     }
   }
 
@@ -297,31 +289,134 @@ function App() {
     const { error } = await supabase.from("books").update({ status }).eq("id", id);
     if (!error) {
       setBooks(books.map((b) => b.id === id ? { ...b, status } : b));
-      if (selectedBook && selectedBook.id === id) {
-        setSelectedBook({ ...selectedBook, status });
-      }
+      if (selectedBook && selectedBook.id === id) setSelectedBook({ ...selectedBook, status });
     }
   }
 
   function resetForm() {
-    setForm({
-      title: "",
-      author: "",
-      publisher: "",
-      rating: 0,
-      favorite: false,
-      pages: "",
-      startDate: "",
-      endDate: "",
-      genre: "",
-      cover: "",
-      summary: "",
-      status: "quero",
-      current_page: 0
-    });
+    setForm({ title: "", author: "", publisher: "", rating: 0, favorite: false, pages: "", startDate: "", endDate: "", genre: "", cover: "", summary: "", status: "quero", current_page: 0 });
     setEditingId(null);
   }
 
+  // =========================================
+  // METODOS DA WISHLIST (NOVO)
+  // =========================================
+  async function fetchWishlist() {
+    setWishlistLoading(true);
+    const { data, error } = await supabase.from("wishlist").select("*").order("created_at", { ascending: false });
+    if (!error && data) setWishlistItems(data);
+    setWishlistLoading(false);
+  }
+
+  async function saveWishlistItem(e) {
+    e.preventDefault();
+    if (!wishlistForm.title || !wishlistForm.author || !user) return;
+
+    const dataPayload = {
+      user_id: user.id,
+      title: wishlistForm.title,
+      author: wishlistForm.author,
+      priority: wishlistForm.priority,
+      price: parseFloat(wishlistForm.price) || 0.00,
+      buy_url: wishlistForm.buy_url,
+      status: wishlistForm.status,
+      notes: wishlistForm.notes,
+      cover: wishlistForm.cover,
+      bought_at: wishlistForm.status === "comprado" ? new Date().toISOString().split('T')[0] : null
+    };
+
+    if (editingWishlistId) {
+      const { error } = await supabase.from("wishlist").update(dataPayload).eq("id", editingWishlistId);
+      if (!error) {
+        setWishlistItems(wishlistItems.map(item => item.id === editingWishlistId ? { ...item, ...dataPayload } : item));
+      }
+    } else {
+      const { data, error } = await supabase.from("wishlist").insert([dataPayload]).select();
+      if (!error && data) setWishlistItems([data[0], ...wishlistItems]);
+    }
+
+    resetWishlistForm();
+    setOpenWishlistModal(false);
+  }
+
+  async function deleteWishlistItem(id) {
+    if (!window.confirm("Deseja remover este item da sua Wishlist?")) return;
+    const { error } = await supabase.from("wishlist").delete().eq("id", id);
+    if (!error) setWishlistItems(wishlistItems.filter(item => item.id !== id));
+  }
+
+  async function toggleWishlistStatus(item) {
+    const nextStatus = item.status === "quero" ? "comprado" : "quero";
+    const dateBought = nextStatus === "comprado" ? new Date().toISOString().split('T')[0] : null;
+
+    const { error } = await supabase.from("wishlist").update({ status: nextStatus, bought_at: dateBought }).eq("id", item.id);
+    if (!error) {
+      setWishlistItems(wishlistItems.map(i => i.id === item.id ? { ...i, status: nextStatus, bought_at: dateBought } : i));
+    }
+  }
+
+  function handleEditWishlist(item) {
+    setWishlistForm({
+      title: item.title,
+      author: item.author,
+      priority: item.priority || "Média",
+      price: item.price || "",
+      buy_url: item.buy_url || "",
+      status: item.status || "quero",
+      notes: item.notes || "",
+      cover: item.cover || ""
+    });
+    setEditingWishlistId(item.id);
+    setOpenWishlistModal(true);
+  }
+
+  function resetWishlistForm() {
+    setWishlistForm({ title: "", author: "", priority: "Média", price: "", buy_url: "", status: "quero", notes: "", cover: "" });
+    setEditingWishlistId(null);
+  }
+
+  function handleWishlistFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setWishlistForm({ ...wishlistForm, cover: reader.result });
+    reader.readAsDataURL(file);
+  }
+
+  // =========================================
+  // PROCESSAMENTO DE FILTROS DA WISHLIST
+  // =========================================
+  const filteredWishlist = wishlistItems
+    .filter(item => {
+      // Busca por Nome ou Autor
+      const matchesSearch = item.title.toLowerCase().includes(wishlistSearch.toLowerCase()) || 
+                            item.author.toLowerCase().includes(wishlistSearch.toLowerCase());
+      // Filtro por Status
+      const matchesStatus = wishlistFilterStatus === "todos" || item.status === wishlistFilterStatus;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      // Opções de ordenação
+      if (wishlistSort === "prioridade") {
+        const weight = { "Alta": 3, "Média": 2, "Baixa": 1 };
+        return (weight[b.priority] || 0) - (weight[a.priority] || 0);
+      }
+      if (wishlistSort === "menor_preco") return (a.price || 0) - (b.price || 0);
+      if (wishlistSort === "maior_preco") return (b.price || 0) - (a.price || 0);
+      return 0;
+    });
+
+  // Cálculos do Dashboard da Wishlist
+  const totalWishlistItems = wishlistItems.length;
+  const totalComprados = wishlistItems.filter(i => i.status === "comprado").length;
+  const totalFaltam = wishlistItems.filter(i => i.status === "quero").length;
+  const orcamentoNecessario = wishlistItems
+    .filter(i => i.status === "quero")
+    .reduce((acc, curr) => acc + (parseFloat(curr.price) || 0), 0);
+
+  // =========================
+  // AUXILIARES DE ESTILOS
+  // =========================
   function handleCardClick(book) {
     setSelectedBook(book); 
     setLogStatusMsg("");
@@ -330,19 +425,11 @@ function App() {
 
   function handleEditFromPreview() {
     setForm({
-      title: selectedBook.title || "",
-      author: selectedBook.author || "",
-      publisher: selectedBook.publisher || "",
-      rating: selectedBook.rating || 0,
-      favorite: selectedBook.favorite || false,
-      pages: selectedBook.pages || "",
-      startDate: selectedBook.startDate || selectedBook.start_date || "",
-      endDate: selectedBook.endDate || selectedBook.end_date || "",
-      genre: selectedBook.genre || "",
-      cover: selectedBook.cover || "",
-      summary: selectedBook.summary || "",
-      status: selectedBook.status || "quero",
-      current_page: selectedBook.current_page || 0
+      title: selectedBook.title || "", author: selectedBook.author || "", publisher: selectedBook.publisher || "",
+      rating: selectedBook.rating || 0, favorite: selectedBook.favorite || false, pages: selectedBook.pages || "",
+      startDate: selectedBook.startDate || selectedBook.start_date || "", endDate: selectedBook.endDate || selectedBook.end_date || "",
+      genre: selectedBook.genre || "", cover: selectedBook.cover || "", summary: selectedBook.summary || "",
+      status: selectedBook.status || "quero", current_page: selectedBook.current_page || 0
     });
     setEditingId(selectedBook.id);
     setSelectedBook(null); 
@@ -357,31 +444,17 @@ function App() {
     reader.readAsDataURL(file);
   }
 
-  // =========================
-  // CALCULOS DOS LOGS (TEMPO)
-  // =========================
   function getStatsByPeriod() {
     const now = new Date();
-    let dayTotal = 0;
-    let weekTotal = 0;
-    let monthTotal = 0;
-
+    let dayTotal = 0; let weekTotal = 0; let monthTotal = 0;
     readingLogs.forEach(log => {
       const logDate = new Date(log.logged_at);
       const diffTime = Math.abs(now - logDate);
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      if (logDate.toDateString() === now.toDateString()) {
-        dayTotal += log.pages_read;
-      }
-      if (diffDays <= 7) {
-        weekTotal += log.pages_read;
-      }
-      if (diffDays <= 30) {
-        monthTotal += log.pages_read;
-      }
+      if (logDate.toDateString() === now.toDateString()) dayTotal += log.pages_read;
+      if (diffDays <= 7) weekTotal += log.pages_read;
+      if (diffDays <= 30) monthTotal += log.pages_read;
     });
-
     return { dayTotal, weekTotal, monthTotal };
   }
 
@@ -391,10 +464,7 @@ function App() {
   function getGenreData() {
     if (books.length === 0) return [];
     const counts = {};
-    books.forEach((book) => {
-      const g = book.genre || "Outros";
-      counts[g] = (counts[g] || 0) + 1;
-    });
+    books.forEach((book) => { const g = book.genre || "Outros"; counts[g] = (counts[g] || 0) + 1; });
     const colors = ["#8c62ff", "#ff62b0", "#62ffb0", "#ffd36e", "#ff9f43", "#4db5ff", "#b8a8c7"];
     const total = books.length;
     return Object.keys(counts).map((genre, index) => ({
@@ -406,8 +476,7 @@ function App() {
     if (genreData.length === 0) return "#444";
     let currentAngle = 0;
     const gradientParts = genreData.map((genre) => {
-      const start = currentAngle;
-      currentAngle += genre.percentage;
+      const start = currentAngle; currentAngle += genre.percentage;
       return `${genre.color} ${start}% ${currentAngle}%`;
     });
     return `conic-gradient(${gradientParts.join(", ")})`;
@@ -420,7 +489,6 @@ function App() {
     return pct > 100 ? 100 : pct;
   }
 
-  // COMPONENTES AUXILIARES
   function Stars({ value, onChange }) {
     return (
       <div className="stars">
@@ -501,7 +569,6 @@ function App() {
 
       const genreData = getGenreData();
       const pieGradient = generatePieGradient(genreData);
-      
       const { dayTotal, weekTotal, monthTotal } = getStatsByPeriod();
 
       const currentBookFeatured = lendoAgora[0];
@@ -613,118 +680,77 @@ function App() {
       );
     }
 
-    // =========================================
-    // NOVA PÁGINA: REGISTRO DE LEITURAS (IMAGEM)
-    // =========================================
     if (page === "registro_leituras") {
       const lendoAgora = byStatus("lendo");
       const livroAtual = lendoAgora[0];
-
       const logsDoMes = readingLogs.filter(log => {
         const logDate = new Date(log.logged_at);
-        return logDate.getMonth() === currentCalendarDate.getMonth() && 
-               logDate.getFullYear() === currentCalendarDate.getFullYear();
+        return logDate.getMonth() === currentCalendarDate.getMonth() && logDate.getFullYear() === currentCalendarDate.getFullYear();
       });
 
       const paginasLidasNoMes = logsDoMes.reduce((acc, log) => acc + log.pages_read, 0);
-      
       const diasUnicos = new Set(logsDoMes.map(log => new Date(log.logged_at).toDateString()));
       const totalDiasLidos = diasUnicos.size;
-      
       const mediaPorDia = totalDiasLidos > 0 ? Math.round(paginasLidasNoMes / totalDiasLidos) : 0;
 
       const ano = currentCalendarDate.getFullYear();
       const mes = currentCalendarDate.getMonth();
       const nomeMeses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-      
       const primeiroDiaDoMes = new Date(ano, mes, 1).getDay();
       const totalDiasNoMes = new Date(ano, mes + 1, 0).getDate();
       
       const diasCalendario = [];
-      for (let i = 0; i < primeiroDiaDoMes; i++) {
-        diasCalendario.push(null);
-      }
-      for (let d = 1; d <= totalDiasNoMes; d++) {
-        diasCalendario.push(new Date(ano, mes, d));
-      }
+      for (let i = 0; i < primeiroDiaDoMes; i++) diasCalendario.push(null);
+      for (let d = 1; d <= totalDiasNoMes; d++) diasCalendario.push(new Date(ano, mes, d));
 
       return (
         <div className="registro-leituras-page">
-          {/* HEADER DA PÁGINA */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div>
               <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)' }}>Registro de Leituras ✦</h2>
               <p style={{ color: 'var(--muted)', fontSize: '14px' }}>Acompanhe cada página da sua jornada.</p>
             </div>
-            <button onClick={() => { resetForm(); setOpenModal(true); }} className="btn-add-magic">
-              + Registrar leitura
-            </button>
+            <button onClick={() => { setOpenLogModal(true); setQuickLogMsg(""); }} className="btn-add-magic">+ Registrar leitura</button>
           </div>
 
-          {/* GRID SUPERIOR: CALENDÁRIO E RESUMO */}
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px', marginBottom: '20px' }}>
-            
-            {/* CARD DO CALENDÁRIO */}
             <div className="card" style={{ padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', alignItems: 'center' }}>
                 <button onClick={() => setCurrentCalendarDate(new Date(ano, mes - 1, 1))} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer' }}>◀</button>
                 <h3 style={{ fontFamily: 'Cinzel, serif', margin: 0 }}>{nomeMeses[mes]} de {ano}</h3>
                 <button onClick={() => setCurrentCalendarDate(new Date(ano, mes + 1, 1))} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer' }}>▶</button>
               </div>
-              
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', fontWeight: 'bold', fontSize: '12px', color: 'var(--gold-soft)', marginBottom: '10px' }}>
                 <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
               </div>
-              
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: '12px', textAlign: 'center' }}>
                 {diasCalendario.map((dataDia, index) => {
                   if (!dataDia) return <div key={index}></div>;
-                  
                   const leuNesseDia = readingLogs.some(log => new Date(log.logged_at).toDateString() === dataDia.toDateString());
-                  
                   return (
                     <div key={index} style={{ position: 'relative', padding: '5px 0', fontSize: '14px' }}>
                       <span>{dataDia.getDate()}</span>
-                      {leuNesseDia && (
-                        <span style={{ position: 'absolute', bottom: '1px', left: '50%', transform: 'translateX(-50%)', width: '5px', height: '5px', backgroundColor: '#ffd36e', borderRadius: '50%' }}></span>
-                      )}
+                      {leuNesseDia && <span style={{ position: 'absolute', bottom: '1px', left: '50%', transform: 'translateX(-50%)', width: '5px', height: '5px', backgroundColor: '#ffd36e', borderRadius: '50%' }}></span>}
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            {/* CARD RESUMO DO MÊS */}
             <div className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center', gap: '15px' }}>
-              <div>
-                <p style={{ fontSize: '12px', color: 'var(--muted)', margin: 0 }}>DIAS LIDOS</p>
-                <h2 style={{ fontFamily: 'Cinzel, serif', color: '#62ffb0', margin: '5px 0' }}>{totalDiasLidos} <span style={{ fontSize: '14px' }}>dias</span></h2>
-              </div>
-              <div style={{ borderTop: '1px solid rgba(214,180,125,0.1)', borderBottom: '1px solid rgba(214,180,125,0.1)', padding: '10px 0' }}>
-                <p style={{ fontSize: '12px', color: 'var(--muted)', margin: 0 }}>PÁGINAS LIDAS</p>
-                <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)', margin: '5px 0' }}>{paginasLidasNoMes.toLocaleString()} <span style={{ fontSize: '14px' }}>páginas</span></h2>
-              </div>
-              <div>
-                <p style={{ fontSize: '12px', color: 'var(--muted)', margin: 0 }}>MÉDIA POR DIA</p>
-                <h2 style={{ fontFamily: 'Cinzel, serif', color: '#8c62ff', margin: '5px 0' }}>{mediaPorDia} <span style={{ fontSize: '14px' }}>páginas</span></h2>
-              </div>
+              <div><p style={{ fontSize: '12px', color: 'var(--muted)', margin: 0 }}>DIAS LIDOS</p><h2 style={{ fontFamily: 'Cinzel, serif', color: '#62ffb0', margin: '5px 0' }}>{totalDiasLidos} <span style={{ fontSize: '14px' }}>dias</span></h2></div>
+              <div style={{ borderTop: '1px solid rgba(214,180,125,0.1)', borderBottom: '1px solid rgba(214,180,125,0.1)', padding: '10px 0' }}><p style={{ fontSize: '12px', color: 'var(--muted)', margin: 0 }}>PÁGINAS LIDAS</p><h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)', margin: '5px 0' }}>{paginasLidasNoMes.toLocaleString()} <span style={{ fontSize: '14px' }}>páginas</span></h2></div>
+              <div><p style={{ fontSize: '12px', color: 'var(--muted)', margin: 0 }}>MÉDIA POR DIA</p><h2 style={{ fontFamily: 'Cinzel, serif', color: '#8c62ff', margin: '5px 0' }}>{mediaPorDia} <span style={{ fontSize: '14px' }}>páginas</span></h2></div>
             </div>
           </div>
 
-          {/* GRID INFERIOR: HISTÓRICO, ATUAL E META */}
           <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 0.7fr', gap: '20px' }}>
-            
-            {/* TABELA DE HISTÓRICO DE LEITURAS */}
             <div className="card" style={{ padding: '20px' }}>
               <h3 style={{ fontFamily: 'Cinzel, serif', marginBottom: '15px' }}>Histórico de Leituras ✍️</h3>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(214,180,125,0.2)', color: 'var(--gold-soft)' }}>
-                      <th style={{ padding: '10px 5px' }}>DATA</th>
-                      <th style={{ padding: '10px 5px' }}>LIVRO</th>
-                      <th style={{ padding: '10px 5px' }}>PÁGINAS LIDAS</th>
-                    </tr>
+                    <tr style={{ borderBottom: '1px solid rgba(214,180,125,0.2)', color: 'var(--gold-soft)' }}><th style={{ padding: '10px 5px' }}>DATA</th><th style={{ padding: '10px 5px' }}>LIVRO</th><th style={{ padding: '10px 5px' }}>PÁGINAS LIDAS</th></tr>
                   </thead>
                   <tbody>
                     {logsDoMes.length > 0 ? (
@@ -732,34 +758,21 @@ function App() {
                         const livroRelacionado = books.find(b => b.id === log.book_id);
                         return (
                           <tr key={log.id} style={{ borderBottom: '1px solid rgba(214,180,125,0.05)' }}>
-                            <td style={{ padding: '10px 5px', color: 'var(--muted)' }}>
-                              {new Date(log.logged_at).toLocaleDateString('pt-BR')}
-                            </td>
-                            <td style={{ padding: '10px 5px', fontWeight: 'bold' }}>
-                              {livroRelacionado ? livroRelacionado.title : "Livro Desconhecido"}
-                            </td>
-                            <td style={{ padding: '10px 5px', color: '#62ffb0' }}>
-                              +{log.pages_read} pág.
-                            </td>
+                            <td style={{ padding: '10px 5px', color: 'var(--muted)' }}>{new Date(log.logged_at).toLocaleDateString('pt-BR')}</td>
+                            <td style={{ padding: '10px 5px', fontWeight: 'bold' }}>{livroRelacionado ? livroRelacionado.title : "Livro Desconhecido"}</td>
+                            <td style={{ padding: '10px 5px', color: '#62ffb0' }}>+{log.pages_read} pág.</td>
                           </tr>
                         );
                       })
                     ) : (
-                      <tr>
-                        <td colSpan="3" style={{ padding: '20px 0', textAlign: 'center', color: 'var(--muted)' }}>
-                          Nenhum registro de leitura lançado este mês.
-                        </td>
-                      </tr>
+                      <tr><td colSpan="3" style={{ padding: '20px 0', textAlign: 'center', color: 'var(--muted)' }}>Nenhum registro de leitura lançado este mês.</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* COLUNA DA DIREITA: LIVRO ATUAL E META DE LEITURA */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              
-              {/* CARD LEITURA ATUAL */}
               <div className="card" style={{ padding: '20px' }}>
                 <h4 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold-soft)', marginBottom: '15px' }}>LEITURA ATUAL</h4>
                 {livroAtual ? (
@@ -768,58 +781,195 @@ function App() {
                     <div style={{ flex: 1 }}>
                       <h4 style={{ margin: '0 0 5px 0', fontSize: '15px' }}>{livroAtual.title}</h4>
                       <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)' }}>{livroAtual.author}</p>
-                      <div className="progress-container" style={{ margin: '10px 0 5px 0', height: '6px' }}>
-                        <div className="progress-bar" style={{ width: `${calculatePercentage(livroAtual.current_page, livroAtual.pages)}%` }}></div>
-                      </div>
-                      <span style={{ fontSize: '11px', color: 'var(--gold-soft)' }}>
-                        {calculatePercentage(livroAtual.current_page, livroAtual.pages)}% concluído
-                      </span>
+                      <div className="progress-container" style={{ margin: '10px 0 5px 0', height: '6px' }}><div className="progress-bar" style={{ width: `${calculatePercentage(livroAtual.current_page, livroAtual.pages)}%` }}></div></div>
+                      <span style={{ fontSize: '11px', color: 'var(--gold-soft)' }}>{calculatePercentage(livroAtual.current_page, livroAtual.pages)}% concluído</span>
                     </div>
                   </div>
-                ) : (
-                  <p style={{ color: 'var(--muted)', fontSize: '13px', margin: 0 }}>Nenhum grimório sendo lido ativamente.</p>
-                )}
+                ) : <p style={{ color: 'var(--muted)', fontSize: '13px', margin: 0 }}>Nenhum grimório sendo lido ativamente.</p>}
               </div>
 
-              {/* CARD META DE LEITURA */}
               <div className="card" style={{ padding: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <h4 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold-soft)', margin: 0 }}>META DE LEITURA ✨</h4>
-                  <input 
-                    type="number" 
-                    value={readingGoal} 
-                    onChange={(e) => setReadingGoal(parseInt(e.target.value) || 0)}
-                    style={{ width: '70px', padding: '4px', fontSize: '12px', textAlign: 'center', background: '#1c1228', border: '1px solid rgba(214,180,125,0.3)', color: '#fff' }}
-                  />
+                  <input type="number" value={readingGoal} onChange={(e) => setReadingGoal(parseInt(e.target.value) || 0)} style={{ width: '70px', padding: '4px', fontSize: '12px', textAlign: 'center', background: '#1c1228', border: '1px solid rgba(214,180,125,0.3)', color: '#fff' }} />
                 </div>
                 <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '0 0 10px 0' }}>Ler {readingGoal} páginas este mês</p>
-                
-                <div className="progress-container" style={{ height: '8px', marginBottom: '5px' }}>
-                  <div className="progress-bar" style={{ width: `${Math.min(calculatePercentage(paginasLidasNoMes, readingGoal), 100)}%`, background: 'linear-gradient(90deg, #8c62ff, #62ffb0)' }}></div>
-                </div>
-                
+                <div className="progress-container" style={{ height: '8px', marginBottom: '5px' }}><div className="progress-bar" style={{ width: `${Math.min(calculatePercentage(paginasLidasNoMes, readingGoal), 100)}%`, background: 'linear-gradient(90deg, #8c62ff, #62ffb0)' }}></div></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                   <span>{paginasLidasNoMes} / {readingGoal} pág.</span>
-                  {paginasLidasNoMes >= readingGoal ? (
-                    <span style={{ color: '#62ffb0', fontWeight: 'bold' }}>Meta concluída! 🔮</span>
-                  ) : (
-                    <span style={{ color: 'var(--muted)' }}>{calculatePercentage(paginasLidasNoMes, readingGoal)}%</span>
-                  )}
+                  {paginasLidasNoMes >= readingGoal ? <span style={{ color: '#62ffb0', fontWeight: 'bold' }}>Meta concluída! 🔮</span> : <span style={{ color: 'var(--muted)' }}>{calculatePercentage(paginasLidasNoMes, readingGoal)}%</span>}
                 </div>
               </div>
-
             </div>
           </div>
         </div>
       );
     }
 
+    // =========================================
+    // PÁGINA: MINHA WISHLIST (DESIGN DA FOTO)
+    // =========================================
     if (page === "wishlist") {
       return (
-        <section className="books shelf-section">
-          <h2>⭐ Wishlist</h2>
-          <div className="netflix-row">{favorites.map(Card)}</div>
-        </section>
+        <div className="wishlist-page" style={{ color: '#fff' }}>
+          {wishlistLoading && <p style={{ color: "var(--gold)", textAlign: "center" }}>Alinhando as estrelas da Wishlist...</p>}
+
+          {/* HEADER COM TITULO E ADICIONAR */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '25px', borderBottom: '1px solid rgba(214,180,125,0.1)', paddingBottom: '15px' }}>
+            <div>
+              <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)', fontSize: '24px', margin: '0 0 5px 0', letterSpacing: '1px' }}>✨ MINHA WISHLIST ✨</h2>
+              <p style={{ color: 'var(--muted)', fontSize: '13px', margin: 0 }}>Livros que quero ler, ter e guardar com carinho na estante.</p>
+            </div>
+            <button onClick={() => { resetWishlistForm(); setOpenWishlistModal(true); }} className="btn-add-magic" style={{ background: 'rgba(140,98,255,0.2)', border: '1px solid #8c62ff', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              + Adicionar livro
+            </button>
+          </div>
+
+          {/* DASHBOARD DE CONTADORES */}
+          <section className="dashboard-counters" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '25px' }}>
+            <div className="counter-card" style={{ background: 'rgba(28,18,40,0.5)', border: '1px solid rgba(214,180,125,0.1)', borderRadius: '12px', padding: '15px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <span style={{ fontSize: '24px', background: 'rgba(140,98,255,0.1)', padding: '10px', borderRadius: '50%' }}>🛍️</span>
+              <div><p style={{ fontSize: '10px', color: 'var(--gold-soft)', margin: 0, letterSpacing: '0.5px' }}>LIVROS NA WISHLIST</p><h3 style={{ margin: '3px 0 0 0', fontFamily: 'Cinzel, serif', fontSize: '20px' }}>{totalWishlistItems} <span style={{ fontSize: '12px', color: 'var(--muted)' }}>livros</span></h3></div>
+            </div>
+            
+            <div className="counter-card" style={{ background: 'rgba(28,18,40,0.5)', border: '1px solid rgba(214,180,125,0.1)', borderRadius: '12px', padding: '15px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <span style={{ fontSize: '24px', background: 'rgba(255,211,110,0.1)', padding: '10px', borderRadius: '50%' }}>💰</span>
+              <div><p style={{ fontSize: '10px', color: 'var(--gold-soft)', margin: 0, letterSpacing: '0.5px' }}>ORÇAMENTO ESTIMADO</p><h3 style={{ margin: '3px 0 0 0', fontFamily: 'Cinzel, serif', fontSize: '20px', color: '#ffd36e' }}>R$ {orcamentoNecessario.toFixed(2)}</h3></div>
+            </div>
+
+            <div className="counter-card" style={{ background: 'rgba(28,18,40,0.5)', border: '1px solid rgba(214,180,125,0.1)', borderRadius: '12px', padding: '15px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <span style={{ fontSize: '24px', background: 'rgba(98,255,176,0.1)', padding: '10px', borderRadius: '50%' }}>✅</span>
+              <div><p style={{ fontSize: '10px', color: 'var(--gold-soft)', margin: 0, letterSpacing: '0.5px' }}>JÁ COMPREI</p><h3 style={{ margin: '3px 0 0 0', fontFamily: 'Cinzel, serif', fontSize: '20px', color: '#62ffb0' }}>{totalComprados} <span style={{ fontSize: '12px', color: 'var(--muted)' }}>livros</span></h3></div>
+            </div>
+
+            <div className="counter-card" style={{ background: 'rgba(28,18,40,0.5)', border: '1px solid rgba(214,180,125,0.1)', borderRadius: '12px', padding: '15px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <span style={{ fontSize: '24px', background: 'rgba(255,98,176,0.1)', padding: '10px', borderRadius: '50%' }}>🛒</span>
+              <div><p style={{ fontSize: '10px', color: 'var(--gold-soft)', margin: 0, letterSpacing: '0.5px' }}>FALTAM COMPRAR</p><h3 style={{ margin: '3px 0 0 0', fontFamily: 'Cinzel, serif', fontSize: '20px', color: '#ff62b0' }}>{totalFaltam} <span style={{ fontSize: '12px', color: 'var(--muted)' }}>livros</span></h3></div>
+            </div>
+          </section>
+
+          {/* BARRA DE FILTROS E BUSCA */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '15px', background: 'rgba(20,13,30,0.6)', padding: '12px 18px', borderRadius: '10px', border: '1px solid rgba(214,180,125,0.05)', marginBottom: '20px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--gold-soft)', whiteSpace: 'nowrap' }}>Ordenar por:</label>
+              <select value={wishlistSort} onChange={(e) => setWishlistSort(e.target.value)} style={{ padding: '6px 10px', background: '#160e24', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px', fontSize: '13px', width: '100%' }}>
+                <option value="prioridade">Prioridade</option>
+                <option value="menor_preco">Menor Preço</option>
+                <option value="maior_preco">Maior Preço</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--gold-soft)', whiteSpace: 'nowrap' }}>Filtrar por status:</label>
+              <select value={wishlistFilterStatus} onChange={(e) => setWishlistFilterStatus(e.target.value)} style={{ padding: '6px 10px', background: '#160e24', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px', fontSize: '13px', width: '100%' }}>
+                <option value="todos">Todos</option>
+                <option value="quero">Quero comprar</option>
+                <option value="comprado">Já comprei</option>
+              </select>
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <input 
+                type="text" 
+                placeholder="Buscar livro ou autor..." 
+                value={wishlistSearch}
+                onChange={(e) => setWishlistSearch(e.target.value)}
+                style={{ width: '100%', padding: '7px 35px 7px 12px', fontSize: '13px', borderRadius: '6px', background: '#160e24', border: '1px solid rgba(214,180,125,0.2)', color: '#fff' }}
+              />
+              <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: '14px' }}>🔍</span>
+            </div>
+          </div>
+
+          {/* TABELA DE LIVROS DA WISHLIST */}
+          <div className="card" style={{ padding: '10px 20px', background: 'rgba(20,13,30,0.3)', border: '1px solid rgba(214,180,125,0.08)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(214,180,125,0.15)', color: 'var(--gold-soft)', fontSize: '11px', letterSpacing: '1px' }}>
+                  <th style={{ padding: '15px 10px', width: '35%' }}>LIVRO / AUTOR</th>
+                  <th style={{ padding: '15px 10px', width: '15%' }}>PREÇO</th>
+                  <th style={{ padding: '15px 10px', width: '15%' }}>PRIORIDADE</th>
+                  <th style={{ padding: '15px 10px', width: '15%' }}>COMPRA</th>
+                  <th style={{ padding: '15px 10px', width: '15%' }}>STATUS</th>
+                  <th style={{ padding: '15px 5px', width: '5%', textAlign: 'center' }}>✦</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredWishlist.length > 0 ? (
+                  filteredWishlist.map((item) => {
+                    // Cor da tag de prioridade
+                    const priorityColor = item.priority === "Alta" ? "#ff62b0" : item.priority === "Média" ? "#ffd36e" : "#4db5ff";
+                    
+                    return (
+                      <tr key={item.id} style={{ borderBottom: '1px solid rgba(214,180,125,0.04)', transition: 'background 0.2s' }} className="wishlist-row-hover">
+                        {/* LIVRO E AUTOR */}
+                        <td style={{ padding: '12px 10px' }}>
+                          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                            <img src={item.cover || "https://via.placeholder.com/45x65"} alt="Capa" style={{ width: '42px', height: '60px', borderRadius: '4px', objectFit: 'cover', border: '1px solid rgba(214,180,125,0.15)' }} />
+                            <div>
+                              <h4 style={{ margin: '0 0 3px 0', fontSize: '14px', fontWeight: '600', color: '#fff' }}>{item.title}</h4>
+                              <p style={{ margin: 0, fontSize: '12px', color: 'var(--muted)' }}>{item.author}</p>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* PREÇO */}
+                        <td style={{ padding: '12px 10px', fontWeight: 'bold', color: 'var(--gold-soft)' }}>
+                          R$ {parseFloat(item.price || 0).toFixed(2)}
+                        </td>
+
+                        {/* PRIORIDADE */}
+                        <td style={{ padding: '12px 10px' }}>
+                          <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: 'rgba(255,255,255,0.03)', border: `1px solid ${priorityColor}`, color: priorityColor }}>
+                            {item.priority || "Média"}
+                          </span>
+                        </td>
+
+                        {/* LINK DE COMPRA */}
+                        <td style={{ padding: '12px 10px' }}>
+                          {item.buy_url ? (
+                            <a href={item.buy_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gold)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12px', background: 'rgba(214,180,125,0.05)', padding: '5px 10px', borderRadius: '5px', border: '1px solid rgba(214,180,125,0.1)' }}>
+                              <span>🛒</span> Ver na Loja ↗
+                            </a>
+                          ) : (
+                            <span style={{ color: 'var(--muted)', fontSize: '12px' }}>Não definido</span>
+                          )}
+                        </td>
+
+                        {/* STATUS */}
+                        <td style={{ padding: '12px 10px' }}>
+                          <div onClick={() => toggleWishlistStatus(item)} style={{ cursor: 'pointer', display: 'inline-flex', flexDirection: 'column' }}>
+                            {item.status === "comprado" ? (
+                              <>
+                                <span style={{ color: '#62ffb0', fontSize: '12px', fontWeight: 'bold' }}>✅ Já comprei</span>
+                                {item.bought_at && <span style={{ fontSize: '10px', color: 'var(--muted)' }}>{new Date(item.bought_at+"T12:00:00").toLocaleDateString('pt-BR')}</span>}
+                              </>
+                            ) : (
+                              <span style={{ color: 'var(--muted)', fontSize: '12px' }}>⚪ Quero comprar</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* AÇÕES DE EDITAR/EXCLUIR */}
+                        <td style={{ padding: '12px 5px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                            <button onClick={() => handleEditWishlist(item)} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: '13px' }} title="Editar">✍️</button>
+                            <button onClick={() => deleteWishlistItem(item.id)} style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer', fontSize: '13px' }} title="Excluir">✕</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan="6" style={{ padding: '30px 0', textAlign: 'center', color: 'var(--muted)' }}>
+                      Nenhum livro encontrado na sua Wishlist. ✨
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       );
     }
     return <section className="books shelf-section"><h2>🎯 Em breve</h2></section>;
@@ -834,20 +984,12 @@ function App() {
         <button onClick={() => setPage("registro_leituras")} style={{ fontWeight: page === "registro_leituras" ? "bold" : "normal" }}>✨ Registro de Leituras</button>
         <button onClick={() => setPage("wishlist")} style={{ fontWeight: page === "wishlist" ? "bold" : "normal" }}>⭐ Wishlist</button>
         
-        <button onClick={() => { setOpenPasswordModal(true); setPasswordStatusMsg(""); }} className="btn-change-pass-sidebar" style={{ marginTop: 'auto', background: 'rgba(214,180,125,0.05)', border: '1px dashed rgba(214,180,125,0.2)' }}>
-          🔑 Alterar Senha
-        </button>
-        
-        <button onClick={handleLogout} className="btn-logout-sidebar" style={{ background: '#321d22', marginTop: '10px' }}>
-          🚪 Fechar Círculo (Sair)
-        </button>
+        <button onClick={() => { setOpenPasswordModal(true); setPasswordStatusMsg(""); }} className="btn-change-pass-sidebar" style={{ marginTop: 'auto', background: 'rgba(214,180,125,0.05)', border: '1px dashed rgba(214,180,125,0.2)' }}>🔑 Alterar Senha</button>
+        <button onClick={handleLogout} className="btn-logout-sidebar" style={{ background: '#321d22', marginTop: '10px' }}>🚪 Fechar Círculo (Sair)</button>
       </aside>
 
       <main className="main">
-        <header className="header">
-          <h1>Arcana</h1>
-          <p>Biblioteca mística pessoal sincronizada em nuvem</p>
-        </header>
+        <header className="header"><h1>Arcana</h1><p>Biblioteca mística pessoal sincronizada em nuvem</p></header>
         {renderPage()}
       </main>
 
@@ -856,7 +998,6 @@ function App() {
         <div className="modal-overlay" onClick={() => setOpenPasswordModal(false)}>
           <div className="modal cozy-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '350px' }}>
             <h2>🔮 Nova Palavra-Passe</h2>
-            <p style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '15px' }}>Digite seu novo segredo de acesso abaixo:</p>
             <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <input type={passwordTargetShow ? "text" : "password"} placeholder="Mínimo 6 dígitos" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} style={{ width: '100%', paddingRight: '40px' }} required />
@@ -872,7 +1013,39 @@ function App() {
         </div>
       )}
 
-      {/* POP-UP DETALHES + ATUALIZADOR DIÁRIO DE LEITURA */}
+      {/* POP-UP DE REGISTRO RÁPIDO DE LEITURA */}
+      {openLogModal && (
+        <div className="modal-overlay" onClick={() => setOpenLogModal(false)}>
+          <div className="modal cozy-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <h2>✍️ Registrar Páginas Lidas</h2>
+            <form onSubmit={handleSaveQuickLog} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--gold-soft)', display: 'block', marginBottom: '5px' }}>Selecione o Livro:</label>
+                <select value={logForm.book_id} onChange={(e) => setLogForm({ ...logForm, book_id: e.target.value })} style={{ width: '100%', padding: '10px', background: '#1c1228', color: '#fff', border: '1px solid rgba(214,180,125,0.3)' }} required>
+                  <option value="">-- Escolha um livro --</option>
+                  {books.filter(b => b.status === "lendo").map(b => <option key={b.id} value={b.id}>{b.title} (pág. atual: {b.current_page})</option>)}
+                  {books.filter(b => b.status !== "lendo").map(b => <option key={b.id} value={b.id}>{b.title} ({b.status})</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--gold-soft)', display: 'block', marginBottom: '5px' }}>Quantas páginas você leu?</label>
+                <input type="number" placeholder="Ex: 25" value={logForm.pages_read} onChange={(e) => setLogForm({ ...logForm, pages_read: e.target.value })} required />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--gold-soft)', display: 'block', marginBottom: '5px' }}>Data da Leitura:</label>
+                <input type="date" value={logForm.logged_at} onChange={(e) => setLogForm({ ...logForm, logged_at: e.target.value })} required />
+              </div>
+              {quickLogMsg && <p style={{ fontSize: '13px', color: quickLogMsg.includes('integradas') ? '#62ffb0' : '#ff6b6b', textAlign: 'center', margin: 0 }}>{quickLogMsg}</p>}
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button type="submit" style={{ flex: 1, background: 'linear-gradient(135deg, #8c62ff, #62ffb0)', color: '#0c0814', fontWeight: 'bold' }}>Salvar Registro</button>
+                <button type="button" onClick={() => setOpenLogModal(false)} style={{ background: '#444' }}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* POP-UP DETALHES + ATUALIZADOR INTERNO */}
       {selectedBook && (
         <div className="modal-overlay" onClick={() => setSelectedBook(null)}>
           <div className="modal book-preview-modal" onClick={(e) => e.stopPropagation()}>
@@ -884,53 +1057,31 @@ function App() {
                   {selectedBook.genre && <span className="tag-genre">🔮 {selectedBook.genre}</span>}
                   {selectedBook.pages && <span className="tag-pages">📄 {selectedBook.pages} pág.</span>}
                 </div>
-
                 {selectedBook.status === "lendo" && (
                   <div style={{ marginTop: '20px', background: 'rgba(214,180,125,0.04)', padding: '15px', borderRadius: '14px', border: '1px dashed rgba(214,180,125,0.2)' }}>
-                    <h5 style={{ margin: '0 0 10px 0', color: 'var(--gold)', fontSize: '12px', letterSpacing: '0.5px' }}>📈 REGISTRAR DIÁRIO</h5>
+                    <h5 style={{ margin: '0 0 10px 0', color: 'var(--gold)', fontSize: '12px' }}>📈 REGISTRAR DIÁRIO</h5>
                     <form onSubmit={handleUpdateProgress} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
                         <span style={{ fontSize: '12px', color: 'var(--muted)' }}>Pág. Atual:</span>
-                        <input 
-                          type="number" 
-                          placeholder={selectedBook.current_page} 
-                          value={inputPageUpdate}
-                          onChange={(e) => setInputPageUpdate(e.target.value)}
-                          style={{ padding: '6px', fontSize: '13px', flex: 1, textAlign: 'center' }}
-                        />
+                        <input type="number" placeholder={selectedBook.current_page} value={inputPageUpdate} onChange={(e) => setInputPageUpdate(e.target.value)} style={{ padding: '6px', fontSize: '13px', flex: 1, textAlign: 'center' }} />
                       </div>
-                      <button type="submit" style={{ padding: '8px', fontSize: '12px', background: 'linear-gradient(135deg, #8c62ff, #62ffb0)', color: '#0c0814', fontWeight: 'bold' }}>
-                        Salvar Páginas
-                      </button>
+                      <button type="submit" style={{ padding: '8px', fontSize: '12px', background: 'linear-gradient(135deg, #8c62ff, #62ffb0)', color: '#0c0814', fontWeight: 'bold' }}>Salvar Páginas</button>
                     </form>
                     {logStatusMsg && <p style={{ fontSize: '11px', color: logStatusMsg.includes('salvo') ? '#62ffb0' : '#ff6b6b', margin: '5px 0 0 0', textAlign: 'center' }}>{logStatusMsg}</p>}
                   </div>
                 )}
               </div>
-              
               <div className="preview-right">
                 <span className="preview-status-badge">{selectedBook.status.toUpperCase()}</span>
                 <h2>{selectedBook.title}</h2>
                 <p className="preview-author">por {selectedBook.author}</p>
                 <div className="preview-rating"><Stars value={selectedBook.rating} /></div>
-                
-                <p className="preview-detail-text">
-                  <strong>Progresso Real:</strong> {calculatePercentage(selectedBook.current_page, selectedBook.pages)}% concluído ({selectedBook.current_page} de {selectedBook.pages || "?"} pág.)
-                </p>
-
+                <p className="preview-detail-text"><strong>Progresso Real:</strong> {calculatePercentage(selectedBook.current_page, selectedBook.pages)}% concluído ({selectedBook.current_page} de {selectedBook.pages || "?"} pág.)</p>
                 {selectedBook.publisher && <p className="preview-detail-text"><strong>Editora:</strong> {selectedBook.publisher}</p>}
-                {(selectedBook.startDate || selectedBook.endDate) && (
-                  <p className="preview-detail-text"><strong>Período:</strong> {selectedBook.startDate || "??"} até {selectedBook.endDate || "??"}</p>
-                )}
-                <div className="preview-summary-box">
-                  <h4>Resumo da Obra</h4>
-                  <p>{selectedBook.summary || "Nenhum resumo místico inserido..."}</p>
-                </div>
+                <div className="preview-summary-box"><h4>Resumo da Obra</h4><p>{selectedBook.summary || "Nenhum resumo místico inserido..."}</p></div>
                 <div className="preview-footer-actions">
                   <button onClick={handleEditFromPreview} className="btn-edit-magic">✍️ Editar</button>
-                  <button onClick={() => toggleFavorite(selectedBook.id)} className="btn-action">
-                    {selectedBook.favorite ? "❤️ Favorito" : "🤍 Favoritar"}
-                  </button>
+                  <button onClick={() => toggleFavorite(selectedBook.id)} className="btn-action">{selectedBook.favorite ? "❤️ Favorito" : "🤍 Favoritar"}</button>
                 </div>
               </div>
             </div>
@@ -938,7 +1089,7 @@ function App() {
         </div>
       )}
 
-      {/* MODAL FORMULÁRIO */}
+      {/* MODAL FORMULÁRIO (LIVROS PRINCIPAIS) */}
       {openModal && (
         <div className="modal-overlay" onClick={() => { resetForm(); setOpenModal(false); }}>
           <div className="modal cozy-modal" onClick={(e) => e.stopPropagation()}>
@@ -949,8 +1100,7 @@ function App() {
             <input placeholder="Gênero" value={form.genre} onChange={(e)=>setForm({...form,genre:e.target.value})}/>
             <input placeholder="Total de Páginas" type="number" value={form.pages} onChange={(e)=>setForm({...form,pages:e.target.value})}/>
             <input placeholder="Página Atual inicial" type="number" value={form.current_page} onChange={(e)=>setForm({...form,current_page:parseInt(e.target.value)||0})}/>
-            <p>Classificação</p>
-            <Stars value={form.rating} onChange={(n)=>setForm({...form,rating:n})}/>
+            <p>Classificação</p><Stars value={form.rating} onChange={(n)=>setForm({...form,rating:n})}/>
             <input type="date" value={form.startDate || ""} onChange={(e)=>setForm({...form,startDate:e.target.value})}/>
             <input type="date" value={form.endDate || ""} onChange={(e)=>setForm({...form,endDate:e.target.value})}/>
             <textarea placeholder="Resumo" value={form.summary} onChange={(e)=>setForm({...form,summary:e.target.value})}/>
@@ -960,6 +1110,102 @@ function App() {
               <button onClick={saveBook} style={{ flex: 1 }}>{editingId ? "Atualizar" : "Salvar no Supabase"}</button>
               <button onClick={() => { resetForm(); setOpenModal(false); }} style={{ background: '#444' }}>Fechar</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* =======================================================
+          NOVO: MODAL DA WISHLIST (FIEL À SEGUNDA FOTO DA IMAGEM)
+          ======================================================= */}
+      {openWishlistModal && (
+        <div className="modal-overlay" onClick={() => { resetWishlistForm(); setOpenWishlistModal(false); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px', padding: '25px', background: '#1c122c', border: '1px solid rgba(214,180,125,0.2)', borderRadius: '14px', position: 'relative' }}>
+            <button onClick={() => { resetWishlistForm(); setOpenWishlistModal(false); }} style={{ position: 'absolute', right: '20px', top: '20px', background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+            
+            <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)', margin: '0 0 5px 0', fontSize: '20px' }}>✦ Adicionar novo livro</h2>
+            <p style={{ color: 'var(--muted)', fontSize: '12px', marginBottom: '20px' }}>Monte seu próximo desejo de leitura na estante.</p>
+
+            <form onSubmit={saveWishlistItem} style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '20px' }}>
+              
+              {/* LADO ESQUERDO: UPLOAD DE CAPA */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--gold-soft)', fontWeight: 'bold' }}>Capa do livro</label>
+                <div style={{ width: '100%', height: '240px', border: '2px dashed rgba(214,180,125,0.2)', borderRadius: '8px', background: wishlistForm.cover ? `url(${wishlistForm.cover}) center/cover no-repeat` : 'rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', position: 'relative', overflow: 'hidden' }}>
+                  {!wishlistForm.cover && (
+                    <div style={{ textAlign: 'center', padding: '10px', color: 'var(--muted)', fontSize: '11px' }}>
+                      <span style={{ fontSize: '24px', display: 'block', marginBottom: '5px' }}>📁</span>
+                      Clique para enviar<br/>ou arraste aqui<br/><span style={{ fontSize: '9px' }}>PNG, JPG até 5MB</span>
+                    </div>
+                  )}
+                  <input type="file" onChange={handleWishlistFile} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} />
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="Ou cole a URL da imagem da capa" 
+                  value={wishlistForm.cover} 
+                  onChange={(e) => setWishlistForm({ ...wishlistForm, cover: e.target.value })}
+                  style={{ fontSize: '11px', padding: '6px' }}
+                />
+              </div>
+
+              {/* LADO DIREITO: CAMPOS DO FORMULÁRIO */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '11px', color: 'var(--gold-soft)', display: 'block', marginBottom: '4px' }}>Título do livro *</label>
+                    <input type="text" placeholder="Ex: A Corte de Névoa e Fúria" value={wishlistForm.title} onChange={(e) => setWishlistForm({ ...wishlistForm, title: e.target.value })} required />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '11px', color: 'var(--gold-soft)', display: 'block', marginBottom: '4px' }}>Autor *</label>
+                    <input type="text" placeholder="Ex: Sarah J. Maas" value={wishlistForm.author} onChange={(e) => setWishlistForm({ ...wishlistForm, author: e.target.value })} required />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '11px', color: 'var(--gold-soft)', display: 'block', marginBottom: '4px' }}>Prioridade de compra</label>
+                    <select value={wishlistForm.priority} onChange={(e) => setWishlistForm({ ...wishlistForm, priority: e.target.value })} style={{ width: '100%', padding: '9px', background: '#130b1e', color: '#fff', border: '1px solid rgba(214,180,125,0.2)' }}>
+                      <option value="Baixa">⭐ Baixa</option>
+                      <option value="Média">⭐ Média</option>
+                      <option value="Alta">🔥 Alta</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '11px', color: 'var(--gold-soft)', display: 'block', marginBottom: '4px' }}>Preço Estimado (R$)</label>
+                    <input type="number" step="0.01" placeholder="Ex: 59.90" value={wishlistForm.price} onChange={(e) => setWishlistForm({ ...wishlistForm, price: e.target.value })} />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--gold-soft)', display: 'block', marginBottom: '4px' }}>Link para compra (URL)</label>
+                  <input type="url" placeholder="🔗 Cole o link do site (Amazon, Submarino, etc.)" value={wishlistForm.buy_url} onChange={(e) => setWishlistForm({ ...wishlistForm, buy_url: e.target.value })} />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--gold-soft)', display: 'block', marginBottom: '4px' }}>Status</label>
+                  <select value={wishlistForm.status} onChange={(e) => setWishlistForm({ ...wishlistForm, status: e.target.value })} style={{ width: '100%', padding: '9px', background: '#130b1e', color: '#fff', border: '1px solid rgba(214,180,125,0.2)' }}>
+                    <option value="quero">Quero comprar</option>
+                    <option value="comprado">Já comprei</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--gold-soft)', display: 'block', marginBottom: '4px' }}>Observações (opcional)</label>
+                  <textarea placeholder="Adicione uma observação sobre o livro..." value={wishlistForm.notes} onChange={(e) => setWishlistForm({ ...wishlistForm, notes: e.target.value })} style={{ height: '70px' }}></textarea>
+                </div>
+
+                {/* BOTÕES DE SUBMIT */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '5px' }}>
+                  <button type="button" onClick={() => { resetWishlistForm(); setOpenWishlistModal(false); }} style={{ background: 'transparent', border: '1px solid rgba(214,180,125,0.3)', color: 'var(--gold-soft)' }}>
+                    ✕ Cancelar
+                  </button>
+                  <button type="submit" style={{ background: '#8c62ff', color: '#fff', fontWeight: 'bold', padding: '10px 20px' }}>
+                    📥 {editingWishlistId ? "Atualizar item" : "Adicionar livro"}
+                  </button>
+                </div>
+
+              </div>
+            </form>
           </div>
         </div>
       )}
