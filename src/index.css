@@ -107,48 +107,54 @@ body {
   transform: translateY(-2px);
 }
 
-/* FILAS NETFLIX (ESTANTE GRID) */
+/* CONTAINER DO ACERVO (Quebra de linha automática) */
 .netflix-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
   width: 100%;
 }
 
-/* CARDS DO ACERVO (EMPILHADOS VERTICALMENTE) */
+/* CARDS DO ACERVO COMPACTOS (Horizontal) */
 .book-card {
-  width: 100%;
-  max-width: 220px;
+  flex: 1 1 320px;
+  max-width: 380px;
+  background: rgba(36, 23, 50, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 14px;
 }
 
 .book-layout {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  text-align: center;
-  gap: 10px;
+  gap: 14px;
   width: 100%;
 }
 
 .book-cover {
-  width: 100%;
-  max-width: 140px;
-  height: 200px;
-  border-radius: 12px;
+  width: 85px;
+  height: 125px;
+  border-radius: 10px;
   object-fit: cover;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, .4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
 }
 
 .book-info {
-  width: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  justify-content: center;
   gap: 4px;
+  text-align: left;
 }
 
 .book-info h3 {
   font-size: 15px;
+  color: var(--gold-soft);
+  margin-bottom: 2px;
   word-break: break-word;
 }
 
@@ -159,23 +165,21 @@ body {
 }
 
 .stars-display {
-  margin: 4px 0;
-  font-size: 13px;
+  font-size: 12px;
+  margin: 2px 0;
 }
 
 .book-actions {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  align-items: center;
   gap: 6px;
-  margin-top: 8px;
+  margin-top: 6px;
   width: 100%;
 }
 
 .book-actions select {
-  width: 100%;
-  padding: 6px;
-  font-size: 12px;
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 /* BOTÕES GERAIS */
@@ -249,7 +253,7 @@ textarea {
   gap: 6px;
 }
 
-/* Contadores Superiores */
+/* CONTADORES SUPERIORES */
 .dashboard-counters {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -286,7 +290,7 @@ textarea {
   color: var(--gold-soft);
 }
 
-/* Bloco Central */
+/* BLOCO CENTRAL */
 .dashboard-middle {
   display: grid;
   grid-template-columns: 1.5fr 1fr;
@@ -387,7 +391,7 @@ textarea {
   box-shadow: 0 0 15px rgba(214, 180, 125, 0.4);
 }
 
-/* Bloco Inferior */
+/* BLOCO INFERIOR */
 .dashboard-lower {
   display: grid;
   grid-template-columns: 1fr 1.5fr;
@@ -477,7 +481,7 @@ textarea {
   font-size: 10px;
 }
 
-/* Rodapé e Acervo */
+/* RODAPÉ E ACERVO */
 .shelf-section {
   background: rgba(20, 13, 30, 0.5);
   border-radius: 24px;
@@ -676,9 +680,7 @@ textarea {
   .cozy-modal { width: 95%; }
 }
 
-/* ==========================================================================
-   ESTILOS ADICIONAIS PARA AUTENTICAÇÃO (SUPABASE AUTH)
-   ========================================================================== */
+/* AUTENTICAÇÃO (SUPABASE AUTH) */
 .auth-container {
   display: flex;
   justify-content: center;
