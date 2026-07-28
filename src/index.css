@@ -107,73 +107,73 @@ body {
   transform: translateY(-2px);
 }
 
-/* FILAS NETFLIX EM GERAL */
+/* FILAS NETFLIX (ESTANTE GRID) */
 .netflix-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 20px;
   width: 100%;
 }
 
-.netflix-row::-webkit-scrollbar {
-  height: 8px;
-}
-
-.netflix-row::-webkit-scrollbar-thumb {
-  background: #49305f;
-  border-radius: 20px;
-}
-
-/* CARDS DO ACERVO */
+/* CARDS DO ACERVO (EMPILHADOS VERTICALMENTE) */
 .book-card {
   width: 100%;
-  max-width: 200px;
+  max-width: 220px;
 }
 
 .book-layout {
   display: flex;
-  gap: 14px;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  width: 100%;
 }
 
 .book-cover {
-  width: 95px;
-  height: 140px;
-  border-radius: 14px;
+  width: 100%;
+  max-width: 140px;
+  height: 200px;
+  border-radius: 12px;
   object-fit: cover;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, .35);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .4);
 }
 
 .book-info {
-  flex: 1;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
 }
 
 .book-info h3 {
-  font-size: 16px;
-  margin-bottom: 2px;
+  font-size: 15px;
+  word-break: break-word;
 }
 
 .author {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
+  word-break: break-word;
 }
 
 .stars-display {
   margin: 4px 0;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .book-actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 6px;
   margin-top: 8px;
+  width: 100%;
 }
 
 .book-actions select {
-  flex: 1;
+  width: 100%;
   padding: 6px;
   font-size: 12px;
 }
@@ -674,7 +674,9 @@ textarea {
   .dashboard-middle, .dashboard-lower { grid-template-columns: 1fr; }
   .preview-layout { grid-template-columns: 1fr; }
   .cozy-modal { width: 95%; }
-}/* ==========================================================================
+}
+
+/* ==========================================================================
    ESTILOS ADICIONAIS PARA AUTENTICAÇÃO (SUPABASE AUTH)
    ========================================================================== */
 .auth-container {
