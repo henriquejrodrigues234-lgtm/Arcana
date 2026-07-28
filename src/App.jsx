@@ -669,11 +669,20 @@ function App() {
           </section>
 
           <section className="books shelf-section">
-            <div className="shelf-header"><h2>MEU ACERVO ✦</h2></div>
-            <div className="netflix-row">
-              {books.length > 0 ? books.map(Card) : <p className="empty-text">Seu acervo místico está vazio. Comece a criar feitiços!</p>}
-            </div>
-          </section>
+  <div className="shelf-header"><h2>MEU ACERVO ✦</h2></div>
+  <div 
+    className="netflix-row" 
+    style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+      gap: '20px',
+      overflowX: 'visible',
+      width: '100%'
+    }}
+  >
+    {books.length > 0 ? books.map(Card) : <p className="empty-text">Nenhum livro no acervo</p>}
+  </div>
+</section>
 
           <footer className="magic-footer"><p>✦ Livros são feitiços disfarçados de palavras. ✦</p></footer>
         </>
