@@ -66,11 +66,11 @@ function App() {
   const [editingWishlistId, setEditingWishlistId] = useState(null);
 
   // Filtros e buscas da Wishlist
-  const [wishlistSort, setWishlistSort] = useState("prioridade");
-  const [wishlistFilterStatus, setWishlistFilterStatus] = useState("todos");
+  const [wishlistSort, setWishlistSort] = useState("prioridade"); // prioridade, menor_preco, maior_preco
+  const [wishlistFilterStatus, setWishlistFilterStatus] = useState("todos"); // todos, quero, comprado
   const [wishlistSearch, setWishlistSearch] = useState("");
 
-  // Form da Wishlist
+  // Form da Wishlist (Baseado no Pop-up da foto)
   const [wishlistForm, setWishlistForm] = useState({
     title: "",
     author: "",
@@ -299,7 +299,7 @@ function App() {
   }
 
   // =========================================
-  // METODOS DA WISHLIST
+  // METODOS DA WISHLIST (NOVO)
   // =========================================
   async function fetchWishlist() {
     setWishlistLoading(true);
@@ -383,15 +383,20 @@ function App() {
     reader.readAsDataURL(file);
   }
 
-  // Processamento de filtros da Wishlist
+  // =========================================
+  // PROCESSAMENTO DE FILTROS DA WISHLIST
+  // =========================================
   const filteredWishlist = wishlistItems
     .filter(item => {
+      // Busca por Nome ou Autor
       const matchesSearch = item.title.toLowerCase().includes(wishlistSearch.toLowerCase()) || 
                             item.author.toLowerCase().includes(wishlistSearch.toLowerCase());
+      // Filtro por Status
       const matchesStatus = wishlistFilterStatus === "todos" || item.status === wishlistFilterStatus;
       return matchesSearch && matchesStatus;
     })
     .sort((a, b) => {
+      // Opções de ordenação
       if (wishlistSort === "prioridade") {
         const weight = { "Alta": 3, "Média": 2, "Baixa": 1 };
         return (weight[b.priority] || 0) - (weight[a.priority] || 0);
@@ -664,20 +669,20 @@ function App() {
           </section>
 
           <section className="books shelf-section">
-            <div className="shelf-header"><h2>MEU ACERVO ✦</h2></div>
-            <div 
-              className="netflix-row" 
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                gap: '20px',
-                overflowX: 'visible',
-                width: '100%'
-              }}
-            >
-              {books.length > 0 ? books.map(Card) : <p className="empty-text">Nenhum livro no acervo</p>}
-            </div>
-          </section>
+  <div className="shelf-header"><h2>MEU ACERVO ✦</h2></div>
+  <div 
+    className="netflix-row" 
+    style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+      gap: '20px',
+      overflowX: 'visible',
+      width: '100%'
+    }}
+  >
+    {books.length > 0 ? books.map(Card) : <p className="empty-text">Nenhum livro no acervo</p>}
+  </div>
+</section>
 
           <footer className="magic-footer"><p>✦ Livros são feitiços disfarçados de palavras. ✦</p></footer>
         </>
@@ -810,11 +815,15 @@ function App() {
       );
     }
 
+    // =========================================
+    // PÁGINA: MINHA WISHLIST (DESIGN DA FOTO)
+    // =========================================
     if (page === "wishlist") {
       return (
         <div className="wishlist-page" style={{ color: '#fff' }}>
           {wishlistLoading && <p style={{ color: "var(--gold)", textAlign: "center" }}>Alinhando as estrelas da Wishlist...</p>}
 
+          {/* HEADER COM TITULO E ADICIONAR */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '25px', borderBottom: '1px solid rgba(214,180,125,0.1)', paddingBottom: '15px' }}>
             <div>
               <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)', fontSize: '24px', margin: '0 0 5px 0', letterSpacing: '1px' }}>✨ MINHA WISHLIST ✨</h2>
@@ -825,6 +834,7 @@ function App() {
             </button>
           </div>
 
+          {/* DASHBOARD DE CONTADORES */}
           <section className="dashboard-counters" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '25px' }}>
             <div className="counter-card" style={{ background: 'rgba(28,18,40,0.5)', border: '1px solid rgba(214,180,125,0.1)', borderRadius: '12px', padding: '15px', display: 'flex', alignItems: 'center', gap: '15px' }}>
               <span style={{ fontSize: '24px', background: 'rgba(140,98,255,0.1)', padding: '10px', borderRadius: '50%' }}>🛍️</span>
@@ -847,6 +857,7 @@ function App() {
             </div>
           </section>
 
+          {/* BARRA DE FILTROS E BUSCA */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '15px', background: 'rgba(20,13,30,0.6)', padding: '12px 18px', borderRadius: '10px', border: '1px solid rgba(214,180,125,0.05)', marginBottom: '20px', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <label style={{ fontSize: '11px', color: 'var(--gold-soft)', whiteSpace: 'nowrap' }}>Ordenar por:</label>
@@ -878,6 +889,7 @@ function App() {
             </div>
           </div>
 
+          {/* TABELA DE LIVROS DA WISHLIST */}
           <div className="card" style={{ padding: '10px 20px', background: 'rgba(20,13,30,0.3)', border: '1px solid rgba(214,180,125,0.08)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
               <thead>
@@ -893,10 +905,12 @@ function App() {
               <tbody>
                 {filteredWishlist.length > 0 ? (
                   filteredWishlist.map((item) => {
+                    // Cor da tag de prioridade
                     const priorityColor = item.priority === "Alta" ? "#ff62b0" : item.priority === "Média" ? "#ffd36e" : "#4db5ff";
                     
                     return (
                       <tr key={item.id} style={{ borderBottom: '1px solid rgba(214,180,125,0.04)', transition: 'background 0.2s' }} className="wishlist-row-hover">
+                        {/* LIVRO E AUTOR */}
                         <td style={{ padding: '12px 10px' }}>
                           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                             <img src={item.cover || "https://via.placeholder.com/45x65"} alt="Capa" style={{ width: '42px', height: '60px', borderRadius: '4px', objectFit: 'cover', border: '1px solid rgba(214,180,125,0.15)' }} />
@@ -907,16 +921,19 @@ function App() {
                           </div>
                         </td>
 
+                        {/* PREÇO */}
                         <td style={{ padding: '12px 10px', fontWeight: 'bold', color: 'var(--gold-soft)' }}>
                           R$ {parseFloat(item.price || 0).toFixed(2)}
                         </td>
 
+                        {/* PRIORIDADE */}
                         <td style={{ padding: '12px 10px' }}>
                           <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: 'rgba(255,255,255,0.03)', border: `1px solid ${priorityColor}`, color: priorityColor }}>
                             {item.priority || "Média"}
                           </span>
                         </td>
 
+                        {/* LINK DE COMPRA */}
                         <td style={{ padding: '12px 10px' }}>
                           {item.buy_url ? (
                             <a href={item.buy_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gold)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12px', background: 'rgba(214,180,125,0.05)', padding: '5px 10px', borderRadius: '5px', border: '1px solid rgba(214,180,125,0.1)' }}>
@@ -927,6 +944,7 @@ function App() {
                           )}
                         </td>
 
+                        {/* STATUS */}
                         <td style={{ padding: '12px 10px' }}>
                           <div onClick={() => toggleWishlistStatus(item)} style={{ cursor: 'pointer', display: 'inline-flex', flexDirection: 'column' }}>
                             {item.status === "comprado" ? (
@@ -940,6 +958,7 @@ function App() {
                           </div>
                         </td>
 
+                        {/* AÇÕES DE EDITAR/EXCLUIR */}
                         <td style={{ padding: '12px 5px', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                             <button onClick={() => handleEditWishlist(item)} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: '13px' }} title="Editar">✍️</button>
@@ -1104,7 +1123,9 @@ function App() {
         </div>
       )}
 
-      {/* MODAL DA WISHLIST */}
+      {/* =======================================================
+          NOVO: MODAL DA WISHLIST (FIEL À SEGUNDA FOTO DA IMAGEM)
+          ======================================================= */}
       {openWishlistModal && (
         <div className="modal-overlay" onClick={() => { resetWishlistForm(); setOpenWishlistModal(false); }}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px', padding: '25px', background: '#1c122c', border: '1px solid rgba(214,180,125,0.2)', borderRadius: '14px', position: 'relative' }}>
@@ -1114,6 +1135,8 @@ function App() {
             <p style={{ color: 'var(--muted)', fontSize: '12px', marginBottom: '20px' }}>Monte seu próximo desejo de leitura na estante.</p>
 
             <form onSubmit={saveWishlistItem} style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '20px' }}>
+              
+              {/* LADO ESQUERDO: UPLOAD DE CAPA */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--gold-soft)', fontWeight: 'bold' }}>Capa do livro</label>
                 <div style={{ width: '100%', height: '240px', border: '2px dashed rgba(214,180,125,0.2)', borderRadius: '8px', background: wishlistForm.cover ? `url(${wishlistForm.cover}) center/cover no-repeat` : 'rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', position: 'relative', overflow: 'hidden' }}>
@@ -1134,6 +1157,7 @@ function App() {
                 />
               </div>
 
+              {/* LADO DIREITO: CAMPOS DO FORMULÁRIO */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
@@ -1179,6 +1203,7 @@ function App() {
                   <textarea placeholder="Adicione uma observação sobre o livro..." value={wishlistForm.notes} onChange={(e) => setWishlistForm({ ...wishlistForm, notes: e.target.value })} style={{ height: '70px' }}></textarea>
                 </div>
 
+                {/* BOTÕES DE SUBMIT */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '5px' }}>
                   <button type="button" onClick={() => { resetWishlistForm(); setOpenWishlistModal(false); }} style={{ background: 'transparent', border: '1px solid rgba(214,180,125,0.3)', color: 'var(--gold-soft)' }}>
                     ✕ Cancelar
