@@ -109,10 +109,10 @@ body {
 
 /* FILAS NETFLIX EM GERAL */
 .netflix-row {
-  display: flex;
-  gap: 16px;
-  overflow-x: auto;
-  padding-bottom: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 20px;
+  width: 100%;
 }
 
 .netflix-row::-webkit-scrollbar {
@@ -126,7 +126,8 @@ body {
 
 /* CARDS DO ACERVO */
 .book-card {
-  min-width: 280px;
+  width: 100%;
+  max-width: 200px;
 }
 
 .book-layout {
