@@ -130,6 +130,12 @@ body {
   max-width: 200px;
 }
 
+/* Position actions (status/select) visually outside the card */
+.book-card {
+  position: relative;
+  padding-bottom: 36px; /* space for the outside controls */
+}
+
 .book-layout {
   display: flex;
   gap: 14px;
@@ -172,10 +178,20 @@ body {
   margin-top: 8px;
 }
 
+/* move the actions visually outside the card */
+.book-card .book-actions {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  margin-top: 0;
+  background: transparent;
+}
+
 .book-actions select {
-  flex: 1;
   padding: 6px;
   font-size: 12px;
+  width: auto;
+  min-width: 84px;
 }
 
 /* BOTÕES GERAIS */
