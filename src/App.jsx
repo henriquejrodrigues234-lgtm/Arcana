@@ -229,7 +229,8 @@ function App() {
   async function handleSaveQuickLog(e) {
     e.preventDefault();
     setQuickLogMsg("");
-    const targetBookId = logForm.book_id;
+    const targetBookIdRaw = logForm.book_id;
+    const targetBookId = isNaN(parseInt(targetBookIdRaw)) ? targetBookIdRaw : parseInt(targetBookIdRaw);
     const pagesReadNum = parseInt(logForm.pages_read);
 
     if (!targetBookId || isNaN(pagesReadNum) || pagesReadNum <= 0) {
@@ -237,7 +238,7 @@ function App() {
       return;
     }
 
-    const selectedTargetBook = books.find(b => b.id === targetBookId);
+    const selectedTargetBook = books.find(b => String(b.id) === String(targetBookId));
     if (!selectedTargetBook) return;
 
     const nextPagesTotal = (selectedTargetBook.current_page || 0) + pagesReadNum;
