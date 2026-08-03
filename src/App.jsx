@@ -719,7 +719,7 @@ function App() {
 
     if (page === "registro_leituras") {
       const lendoAgora = byStatus("lendo");
-      const livroAtual = lendoAgora[0];
+      const livroAtual = lendoAgora.length > 0 ? lendoAgora[currentReadingIndex] : null;
       const logsDoMes = readingLogs.filter(log => {
         const logDate = new Date(log.logged_at);
         return logDate.getMonth() === currentCalendarDate.getMonth() && logDate.getFullYear() === currentCalendarDate.getFullYear();
@@ -813,14 +813,18 @@ function App() {
               <div className="card" style={{ padding: '20px' }}>
                 <h4 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold-soft)', marginBottom: '15px' }}>LEITURA ATUAL</h4>
                 {livroAtual ? (
-                  <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                    <img src={livroAtual.cover || "https://via.placeholder.com/70x105"} alt="Capa" style={{ width: '70px', borderRadius: '6px', border: '1px solid rgba(214,180,125,0.2)' }} />
-                    <div style={{ flex: 1 }}>
-                      <h4 style={{ margin: '0 0 5px 0', fontSize: '15px' }}>{livroAtual.title}</h4>
-                      <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)' }}>{livroAtual.author}</p>
-                      <div className="progress-container" style={{ margin: '10px 0 5px 0', height: '6px' }}><div className="progress-bar" style={{ width: `${calculatePercentage(livroAtual.current_page, livroAtual.pages)}%` }}></div></div>
-                      <span style={{ fontSize: '11px', color: 'var(--gold-soft)' }}>{calculatePercentage(livroAtual.current_page, livroAtual.pages)}% concluído</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <button onClick={(e) => { e.stopPropagation(); prevReading(); }} style={{ background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '18px', cursor: 'pointer' }}>◀</button>
+                    <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }} onClick={() => handleCardClick(livroAtual)}>
+                      <img src={livroAtual.cover || "https://via.placeholder.com/70x105"} alt="Capa" style={{ width: '70px', borderRadius: '6px', border: '1px solid rgba(214,180,125,0.2)' }} />
+                      <div style={{ flex: 1 }}>
+                        <h4 style={{ margin: '0 0 5px 0', fontSize: '15px' }}>{livroAtual.title}</h4>
+                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)' }}>{livroAtual.author}</p>
+                        <div className="progress-container" style={{ margin: '10px 0 5px 0', height: '6px' }}><div className="progress-bar" style={{ width: `${calculatePercentage(livroAtual.current_page, livroAtual.pages)}%` }}></div></div>
+                        <span style={{ fontSize: '11px', color: 'var(--gold-soft)' }}>{calculatePercentage(livroAtual.current_page, livroAtual.pages)}% concluído</span>
+                      </div>
                     </div>
+                    <button onClick={(e) => { e.stopPropagation(); nextReading(); }} style={{ background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '18px', cursor: 'pointer' }}>▶</button>
                   </div>
                 ) : <p style={{ color: 'var(--muted)', fontSize: '13px', margin: 0 }}>Nenhum grimório sendo lido ativamente.</p>}
               </div>
