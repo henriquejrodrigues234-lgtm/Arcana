@@ -265,6 +265,16 @@ function App() {
     }
   }
 
+  async function deleteLog(id) {
+    if (!window.confirm("Deseja remover este registro de leitura?")) return;
+    const { error } = await supabase.from("reading_logs").delete().eq("id", id);
+    if (!error) {
+      setReadingLogs(readingLogs.filter(l => l.id !== id));
+    } else {
+      alert("⚠️ Erro ao remover registro.");
+    }
+  }
+
   async function deleteBook(id, e) {
     if (e) e.stopPropagation();
     const { error } = await supabase.from("books").delete().eq("id", id);
@@ -787,19 +797,27 @@ function App() {
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(214,180,125,0.2)', color: 'var(--gold-soft)' }}><th style={{ padding: '10px 5px' }}>DATA</th><th style={{ padding: '10px 5px' }}>LIVRO</th><th style={{ padding: '10px 5px' }}>PÁGINAS LIDAS</th></tr>
+                    <tr style={{ borderBottom: '1px solid rgba(214,180,125,0.2)', color: 'var(--gold-soft)' }}>
+                      <th style={{ padding: '10px 5px' }}>DATA</th>
+                      <th style={{ padding: '10px 5px' }}>LIVRO</th>
+                      <th style={{ padding: '10px 5px' }}>PÁGINAS LIDAS</th>
+                      <th style={{ padding: '10px 5px', width: '60px', textAlign: 'center' }}>AÇÕES</th>
+                    </tr>
                   </thead>
                   <tbody>
                     {logsDoMes.length > 0 ? (
                       logsDoMes.map((log) => {
                         const livroRelacionado = books.find(b => b.id === log.book_id);
                         return (
-                          <tr key={log.id} style={{ borderBottom: '1px solid rgba(214,180,125,0.05)' }}>
-                            <td style={{ padding: '10px 5px', color: 'var(--muted)' }}>{new Date(log.logged_at).toLocaleDateString('pt-BR')}</td>
-                            <td style={{ padding: '10px 5px', fontWeight: 'bold' }}>{livroRelacionado ? livroRelacionado.title : "Livro Desconhecido"}</td>
-                            <td style={{ padding: '10px 5px', color: '#62ffb0' }}>+{log.pages_read} pág.</td>
-                          </tr>
-                        );
+                            <tr key={log.id} style={{ borderBottom: '1px solid rgba(214,180,125,0.05)' }}>
+                              <td style={{ padding: '10px 5px', color: 'var(--muted)' }}>{new Date(log.logged_at).toLocaleDateString('pt-BR')}</td>
+                              <td style={{ padding: '10px 5px', fontWeight: 'bold' }}>{livroRelacionado ? livroRelacionado.title : "Livro Desconhecido"}</td>
+                              <td style={{ padding: '10px 5px', color: '#62ffb0' }}>+{log.pages_read} pág.</td>
+                              <td style={{ padding: '10px 5px', textAlign: 'center' }}>
+                                <button onClick={() => deleteLog(log.id)} style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer', fontSize: '14px' }} title="Excluir registro">✕</button>
+                              </td>
+                            </tr>
+                          );
                       })
                     ) : (
                       <tr><td colSpan="3" style={{ padding: '20px 0', textAlign: 'center', color: 'var(--muted)' }}>Nenhum registro de leitura lançado este mês.</td></tr>
