@@ -30,6 +30,7 @@ function App() {
   const [openModal, setOpenModal] = useState(false);
   const [editingId, setEditingId] = useState(null); 
   const [selectedBook, setSelectedBook] = useState(null); 
+  const [currentReadingIndex, setCurrentReadingIndex] = useState(0);
 
   // =========================
   // RASTREAMENTO & METAS
@@ -489,6 +490,28 @@ function App() {
     return pct > 100 ? 100 : pct;
   }
 
+  // Navegação entre livros que estão com status 'lendo'
+  function prevReading() {
+    const lendo = byStatus("lendo");
+    if (!lendo || lendo.length === 0) return;
+    setCurrentReadingIndex((i) => (i - 1 + lendo.length) % lendo.length);
+  }
+
+  function nextReading() {
+    const lendo = byStatus("lendo");
+    if (!lendo || lendo.length === 0) return;
+    setCurrentReadingIndex((i) => (i + 1) % lendo.length);
+  }
+
+  useEffect(() => {
+    const lendo = byStatus("lendo");
+    if (!lendo || lendo.length === 0) {
+      setCurrentReadingIndex(0);
+    } else if (currentReadingIndex > lendo.length - 1) {
+      setCurrentReadingIndex(0);
+    }
+  }, [books]);
+
   function Stars({ value, onChange }) {
     return (
       <div className="stars">
@@ -571,7 +594,7 @@ function App() {
       const pieGradient = generatePieGradient(genreData);
       const { dayTotal, weekTotal, monthTotal } = getStatsByPeriod();
 
-      const currentBookFeatured = lendoAgora[0];
+      const currentBookFeatured = lendoAgora.length > 0 ? lendoAgora[currentReadingIndex] : null;
       const currentPct = currentBookFeatured ? calculatePercentage(currentBookFeatured.current_page, currentBookFeatured.pages) : 0;
 
       return (
@@ -636,16 +659,20 @@ function App() {
             <div className="current-reading-section">
               <h3>LENDO AGORA ✨</h3>
               {currentBookFeatured ? (
-                <div className="current-book-display" onClick={() => handleCardClick(currentBookFeatured)} style={{ cursor: 'pointer' }}>
-                  <img src={currentBookFeatured.cover || "https://via.placeholder.com/120x180"} alt="Capa" />
-                  <div className="current-book-details">
-                    <h4>{currentBookFeatured.title}</h4>
-                    <p>{currentBookFeatured.author}</p>
-                    <div className="progress-container">
-                      <div className="progress-bar" style={{ width: `${currentPct}%` }}></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button onClick={(e) => { e.stopPropagation(); prevReading(); }} style={{ background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '20px', cursor: 'pointer' }}>◀</button>
+                  <div className="current-book-display" onClick={() => handleCardClick(currentBookFeatured)} style={{ cursor: 'pointer' }}>
+                    <img src={currentBookFeatured.cover || "https://via.placeholder.com/120x180"} alt="Capa" />
+                    <div className="current-book-details">
+                      <h4>{currentBookFeatured.title}</h4>
+                      <p>{currentBookFeatured.author}</p>
+                      <div className="progress-container">
+                        <div className="progress-bar" style={{ width: `${currentPct}%` }}></div>
+                      </div>
+                      <span className="progress-text">{currentPct}% concluído ({currentBookFeatured.current_page}/{currentBookFeatured.pages || "?"} pág)</span>
                     </div>
-                    <span className="progress-text">{currentPct}% concluído ({currentBookFeatured.current_page}/{currentBookFeatured.pages || "?"} pág)</span>
                   </div>
+                  <button onClick={(e) => { e.stopPropagation(); nextReading(); }} style={{ background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '20px', cursor: 'pointer' }}>▶</button>
                 </div>
               ) : (
                 <p className="empty-text">Nenhum livro sendo lido no momento.</p>
