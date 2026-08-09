@@ -155,8 +155,9 @@ function App() {
   // DATABASE CRUD & LOGS
   // =========================
   async function fetchBooks() {
+    if (!user) return;
     setBooksLoading(true);
-    const { data, error } = await supabase.from("books").select("*").order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("books").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
     if (!error && data) {
       setBooks(data.map(b => ({ ...b, startDate: b.start_date, endDate: b.end_date, current_page: b.current_page || 0 })));
     }
@@ -164,7 +165,8 @@ function App() {
   }
 
   async function fetchLogs() {
-    const { data, error } = await supabase.from("reading_logs").select("*").order("logged_at", { ascending: false });
+    if (!user) return;
+    const { data, error } = await supabase.from("reading_logs").select("*").eq("user_id", user.id).order("logged_at", { ascending: false });
     if (!error && data) setReadingLogs(data);
   }
 
@@ -314,8 +316,9 @@ function App() {
   // METODOS DA WISHLIST (NOVO)
   // =========================================
   async function fetchWishlist() {
+    if (!user) return;
     setWishlistLoading(true);
-    const { data, error } = await supabase.from("wishlist").select("*").order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("wishlist").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
     if (!error && data) setWishlistItems(data);
     setWishlistLoading(false);
   }
