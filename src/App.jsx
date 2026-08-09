@@ -1051,13 +1051,22 @@ function App() {
                 <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(214,180,125,0.08)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
                     {book.cover ? <img src={book.cover} alt={book.title} style={{ width: '44px', height: '64px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(214,180,125,0.15)' }} /> : <div style={{ width: '44px', height: '64px', borderRadius: '6px', background: 'rgba(214,180,125,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>📖</div>}
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <div style={{ color: 'var(--gold-soft)', fontWeight: 'bold' }}>{book.title}</div>
                       {book.author && <div style={{ color: 'var(--muted)', fontSize: '12px' }}>{book.author}</div>}
-                      {book.read && <div style={{ color: '#62ffb0', fontSize: '11px', marginTop: '4px' }}>✓ Já li</div>}
+                      <div style={{ color: book.read ? '#62ffb0' : 'var(--muted)', fontSize: '11px', marginTop: '4px' }}>{book.read ? '✓ Já li' : '○ Ainda quero ler'}</div>
                     </div>
                   </div>
-                  <button onClick={() => removeBeforeThirtyBook(index)} style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer', fontSize: '14px' }}>✕</button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button onClick={() => {
+                      const updated = [...beforeThirtyBooks];
+                      updated[index] = { ...updated[index], read: !updated[index].read };
+                      setBeforeThirtyBooks(updated);
+                    }} style={{ background: book.read ? 'rgba(98,255,176,0.15)' : 'rgba(214,180,125,0.08)', border: '1px solid rgba(214,180,125,0.2)', color: book.read ? '#62ffb0' : 'var(--gold-soft)', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                      {book.read ? '✓ Li' : '↺ Não li'}
+                    </button>
+                    <button onClick={() => removeBeforeThirtyBook(index)} style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer', fontSize: '14px' }}>✕</button>
+                  </div>
                 </div>
               )) : (
                 <p style={{ color: 'var(--muted)', margin: 0 }}>Sua lista ainda está em branco. Que tal adicionar o primeiro livro?</p>
