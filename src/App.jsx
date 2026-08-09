@@ -458,15 +458,42 @@ function App() {
 
   function getStatsByPeriod() {
     const now = new Date();
-    let dayTotal = 0; let weekTotal = 0; let monthTotal = 0;
-    readingLogs.forEach(log => {
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+    const dayOfWeek = startOfToday.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfToday.getDate() - diffToMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    let dayTotal = 0;
+    let weekTotal = 0;
+    let monthTotal = 0;
+
+    readingLogs.forEach((log) => {
       const logDate = new Date(log.logged_at);
-      const diffTime = Math.abs(now - logDate);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      if (logDate.toDateString() === now.toDateString()) dayTotal += log.pages_read;
-      if (diffDays <= 7) weekTotal += log.pages_read;
-      if (diffDays <= 30) monthTotal += log.pages_read;
+      const logTime = logDate.getTime();
+
+      if (logTime >= startOfToday.getTime() && logTime < endOfToday.getTime()) {
+        dayTotal += log.pages_read;
+      }
+
+      if (logTime >= startOfWeek.getTime() && logTime < endOfWeek.getTime()) {
+        weekTotal += log.pages_read;
+      }
+
+      if (logTime >= startOfMonth.getTime() && logTime < endOfMonth.getTime()) {
+        monthTotal += log.pages_read;
+      }
     });
+
     return { dayTotal, weekTotal, monthTotal };
   }
 
