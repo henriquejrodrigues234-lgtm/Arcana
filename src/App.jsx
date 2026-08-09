@@ -89,7 +89,7 @@ function App() {
     booksPerYear: 24
   });
   const [beforeThirtyBooks, setBeforeThirtyBooks] = useState([]);
-  const [beforeThirtyForm, setBeforeThirtyForm] = useState("");
+  const [beforeThirtyForm, setBeforeThirtyForm] = useState({ title: "", author: "", cover: "", read: false });
   const [openBeforeThirtyModal, setOpenBeforeThirtyModal] = useState(false);
 
   useEffect(() => {
@@ -113,14 +113,20 @@ function App() {
       const savedGoals = localStorage.getItem(`arcana-goals-${user.id}`);
       const savedBeforeThirty = localStorage.getItem(`arcana-before-thirty-${user.id}`);
       if (savedGoals) setGoals(JSON.parse(savedGoals));
-      if (savedBeforeThirty) setBeforeThirtyBooks(JSON.parse(savedBeforeThirty));
+      if (savedBeforeThirty) {
+        const parsed = JSON.parse(savedBeforeThirty);
+        const normalized = Array.isArray(parsed)
+          ? parsed.map((item) => typeof item === 'string' ? { title: item, author: '', cover: '', read: false } : item)
+          : [];
+        setBeforeThirtyBooks(normalized);
+      }
     } else {
       setBooks([]);
       setReadingLogs([]);
       setWishlistItems([]);
       setGoals({ pagesPerDay: 30, booksPerMonth: 2, booksPerYear: 24 });
       setBeforeThirtyBooks([]);
-      setBeforeThirtyForm("");
+      setBeforeThirtyForm({ title: "", author: "", cover: "", read: false });
     }
   }, [user]);
 
@@ -495,10 +501,11 @@ function App() {
 
   function addBeforeThirtyBook(e) {
     e.preventDefault();
-    const title = beforeThirtyForm.trim();
+    const title = beforeThirtyForm.title.trim();
+    const author = beforeThirtyForm.author.trim();
     if (!title) return;
-    setBeforeThirtyBooks([...beforeThirtyBooks, title]);
-    setBeforeThirtyForm("");
+    setBeforeThirtyBooks([...beforeThirtyBooks, { title, author, cover: beforeThirtyForm.cover.trim(), read: beforeThirtyForm.read }]);
+    setBeforeThirtyForm({ title: "", author: "", cover: "", read: false });
     setOpenBeforeThirtyModal(false);
   }
 
@@ -1036,13 +1043,20 @@ function App() {
                 <h3 style={{ margin: 0, fontFamily: 'Cinzel, serif', color: 'var(--gold)' }}>30 ANTES DOS 30 ✨</h3>
                 <p style={{ color: 'var(--muted)', fontSize: '13px', margin: '4px 0 0 0' }}>Adicione os livros que você quer ler antes de completar 30 anos.</p>
               </div>
-              <button onClick={() => { setBeforeThirtyForm(""); setOpenBeforeThirtyModal(true); }} style={{ padding: '10px 16px', background: 'linear-gradient(135deg, #8c62ff, #62ffb0)', color: '#0c0814', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>+ Adicionar</button>
+              <button onClick={() => { setBeforeThirtyForm({ title: "", author: "", cover: "", read: false }); setOpenBeforeThirtyModal(true); }} style={{ padding: '10px 16px', background: 'linear-gradient(135deg, #8c62ff, #62ffb0)', color: '#0c0814', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>+ Adicionar</button>
             </div>
 
             <div style={{ display: 'grid', gap: '10px' }}>
               {beforeThirtyBooks.length > 0 ? beforeThirtyBooks.map((book, index) => (
-                <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(214,180,125,0.08)' }}>
-                  <span style={{ color: 'var(--gold-soft)' }}>{book}</span>
+                <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(214,180,125,0.08)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                    {book.cover ? <img src={book.cover} alt={book.title} style={{ width: '44px', height: '64px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(214,180,125,0.15)' }} /> : <div style={{ width: '44px', height: '64px', borderRadius: '6px', background: 'rgba(214,180,125,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>📖</div>}
+                    <div>
+                      <div style={{ color: 'var(--gold-soft)', fontWeight: 'bold' }}>{book.title}</div>
+                      {book.author && <div style={{ color: 'var(--muted)', fontSize: '12px' }}>{book.author}</div>}
+                      {book.read && <div style={{ color: '#62ffb0', fontSize: '11px', marginTop: '4px' }}>✓ Já li</div>}
+                    </div>
+                  </div>
                   <button onClick={() => removeBeforeThirtyBook(index)} style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer', fontSize: '14px' }}>✕</button>
                 </div>
               )) : (
@@ -1367,16 +1381,46 @@ function App() {
           NOVO: MODAL DA WISHLIST (FIEL À SEGUNDA FOTO DA IMAGEM)
           ======================================================= */}
       {openBeforeThirtyModal && (
-        <div className="modal-overlay" onClick={() => { setBeforeThirtyForm(""); setOpenBeforeThirtyModal(false); }}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', padding: '24px', background: '#1c122c', border: '1px solid rgba(214,180,125,0.2)', borderRadius: '14px', position: 'relative' }}>
-            <button onClick={() => { setBeforeThirtyForm(""); setOpenBeforeThirtyModal(false); }} style={{ position: 'absolute', right: '20px', top: '20px', background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '18px', cursor: 'pointer' }}>✕</button>
-            <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)', margin: '0 0 8px 0', fontSize: '20px' }}>✦ Adicionar livro</h2>
-            <p style={{ color: 'var(--muted)', fontSize: '13px', marginBottom: '16px' }}>Escolha o próximo livro da sua lista antes dos 30.</p>
-            <form onSubmit={addBeforeThirtyBook} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <input type="text" value={beforeThirtyForm} onChange={(e) => setBeforeThirtyForm(e.target.value)} placeholder="Nome do livro" style={{ padding: '10px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '8px' }} />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button type="button" onClick={() => { setBeforeThirtyForm(""); setOpenBeforeThirtyModal(false); }} style={{ background: 'transparent', border: '1px solid rgba(214,180,125,0.3)', color: 'var(--gold-soft)' }}>Cancelar</button>
-                <button type="submit" style={{ background: 'linear-gradient(135deg, #8c62ff, #62ffb0)', color: '#0c0814', fontWeight: 'bold', padding: '10px 16px' }}>Salvar</button>
+        <div className="modal-overlay" onClick={() => { setBeforeThirtyForm({ title: "", author: "", cover: "", read: false }); setOpenBeforeThirtyModal(false); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px', padding: '25px', background: '#1c122c', border: '1px solid rgba(214,180,125,0.2)', borderRadius: '14px', position: 'relative' }}>
+            <button onClick={() => { setBeforeThirtyForm({ title: "", author: "", cover: "", read: false }); setOpenBeforeThirtyModal(false); }} style={{ position: 'absolute', right: '20px', top: '20px', background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+            <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)', margin: '0 0 5px 0', fontSize: '20px' }}>✦ Adicionar novo livro</h2>
+            <p style={{ color: 'var(--muted)', fontSize: '12px', marginBottom: '20px' }}>Adicione o livro que você quer ler antes dos 30.</p>
+
+            <form onSubmit={addBeforeThirtyBook} style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--gold-soft)', fontWeight: 'bold' }}>Capa do livro</label>
+                <div style={{ width: '100%', height: '240px', border: '2px dashed rgba(214,180,125,0.2)', borderRadius: '8px', background: beforeThirtyForm.cover ? `url(${beforeThirtyForm.cover}) center/cover no-repeat` : 'rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', position: 'relative', overflow: 'hidden' }}>
+                  {!beforeThirtyForm.cover && (
+                    <div style={{ textAlign: 'center', padding: '10px', color: 'var(--muted)', fontSize: '11px' }}>
+                      <span style={{ fontSize: '24px', display: 'block', marginBottom: '5px' }}>📁</span>
+                      Cole a URL da capa aqui
+                    </div>
+                  )}
+                </div>
+                <input type="url" placeholder="URL da imagem da capa" value={beforeThirtyForm.cover} onChange={(e) => setBeforeThirtyForm({ ...beforeThirtyForm, cover: e.target.value })} style={{ fontSize: '11px', padding: '6px' }} />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--gold-soft)', display: 'block', marginBottom: '4px' }}>Título do livro *</label>
+                  <input type="text" placeholder="Ex: A Corte de Névoa e Fúria" value={beforeThirtyForm.title} onChange={(e) => setBeforeThirtyForm({ ...beforeThirtyForm, title: e.target.value })} required />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--gold-soft)', display: 'block', marginBottom: '4px' }}>Autor *</label>
+                  <input type="text" placeholder="Ex: Sarah J. Maas" value={beforeThirtyForm.author} onChange={(e) => setBeforeThirtyForm({ ...beforeThirtyForm, author: e.target.value })} required />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 0' }}>
+                  <input type="checkbox" checked={beforeThirtyForm.read} onChange={(e) => setBeforeThirtyForm({ ...beforeThirtyForm, read: e.target.checked })} />
+                  <label style={{ fontSize: '12px', color: 'var(--gold-soft)' }}>Já li este livro</label>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '5px' }}>
+                  <button type="button" onClick={() => { setBeforeThirtyForm({ title: "", author: "", cover: "", read: false }); setOpenBeforeThirtyModal(false); }} style={{ background: 'transparent', border: '1px solid rgba(214,180,125,0.3)', color: 'var(--gold-soft)' }}>✕ Cancelar</button>
+                  <button type="submit" style={{ background: 'linear-gradient(135deg, #8c62ff, #62ffb0)', color: '#0c0814', fontWeight: 'bold', padding: '10px 16px' }}>Salvar</button>
+                </div>
               </div>
             </form>
           </div>
