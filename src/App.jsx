@@ -952,6 +952,7 @@ function App() {
     if (page === "metas") {
       const todayStats = getStatsByPeriod();
       const now = new Date();
+      const booksById = new Map(books.map((book) => [String(book.id), book]));
       const completedBooksFromAcervo = books.filter((book) => {
         if (book.status !== "lido") return false;
         if (!book.endDate) return false;
@@ -965,10 +966,14 @@ function App() {
         return endDate.getFullYear() === now.getFullYear();
       }).length;
       const booksCompletedThisMonth = completedBooksFromAcervo + beforeThirtyBooks.filter((book) => book.read).length + readingLogs.filter((log) => {
+        const currentBook = booksById.get(String(log.book_id));
+        if (!currentBook || currentBook.status !== "lido") return false;
         const logDate = new Date(log.logged_at);
         return logDate.getMonth() === now.getMonth() && logDate.getFullYear() === now.getFullYear();
       }).length;
       const booksCompletedThisYear = completedBooksFromYear + beforeThirtyBooks.filter((book) => book.read).length + readingLogs.filter((log) => {
+        const currentBook = booksById.get(String(log.book_id));
+        if (!currentBook || currentBook.status !== "lido") return false;
         const logDate = new Date(log.logged_at);
         return logDate.getFullYear() === now.getFullYear();
       }).length;
