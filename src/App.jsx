@@ -83,6 +83,14 @@ function App() {
     cover: ""
   });
 
+  const [goals, setGoals] = useState({
+    pagesPerDay: 30,
+    booksPerMonth: 2,
+    booksPerYear: 24
+  });
+  const [beforeThirtyBooks, setBeforeThirtyBooks] = useState([]);
+  const [beforeThirtyForm, setBeforeThirtyForm] = useState("");
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -101,12 +109,29 @@ function App() {
       fetchBooks();
       fetchLogs();
       fetchWishlist();
+      const savedGoals = localStorage.getItem(`arcana-goals-${user.id}`);
+      const savedBeforeThirty = localStorage.getItem(`arcana-before-thirty-${user.id}`);
+      if (savedGoals) setGoals(JSON.parse(savedGoals));
+      if (savedBeforeThirty) setBeforeThirtyBooks(JSON.parse(savedBeforeThirty));
     } else {
       setBooks([]);
       setReadingLogs([]);
       setWishlistItems([]);
+      setGoals({ pagesPerDay: 30, booksPerMonth: 2, booksPerYear: 24 });
+      setBeforeThirtyBooks([]);
+      setBeforeThirtyForm("");
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    localStorage.setItem(`arcana-goals-${user.id}`, JSON.stringify(goals));
+  }, [user, goals]);
+
+  useEffect(() => {
+    if (!user) return;
+    localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify(beforeThirtyBooks));
+  }, [user, beforeThirtyBooks]);
 
   // =========================
   // METODOS DE AUTENTICAÇÃO
@@ -457,6 +482,18 @@ function App() {
     const reader = new FileReader();
     reader.onload = () => setForm({ ...form, cover: reader.result });
     reader.readAsDataURL(file);
+  }
+
+  function addBeforeThirtyBook(e) {
+    e.preventDefault();
+    const title = beforeThirtyForm.trim();
+    if (!title) return;
+    setBeforeThirtyBooks([...beforeThirtyBooks, title]);
+    setBeforeThirtyForm("");
+  }
+
+  function removeBeforeThirtyBook(index) {
+    setBeforeThirtyBooks(beforeThirtyBooks.filter((_, i) => i !== index));
   }
 
   function getStatsByPeriod() {
@@ -895,6 +932,115 @@ function App() {
       );
     }
 
+    if (page === "metas") {
+      const todayStats = getStatsByPeriod();
+      const now = new Date();
+      const booksCompletedThisMonth = books.filter((book) => {
+        if (book.status !== "lido") return false;
+        if (!book.endDate) return false;
+        const endDate = new Date(book.endDate + "T12:00:00");
+        return endDate.getMonth() === now.getMonth() && endDate.getFullYear() === now.getFullYear();
+      }).length;
+      const booksCompletedThisYear = books.filter((book) => {
+        if (book.status !== "lido") return false;
+        if (!book.endDate) return false;
+        const endDate = new Date(book.endDate + "T12:00:00");
+        return endDate.getFullYear() === now.getFullYear();
+      }).length;
+
+      const progressPages = Math.min(Math.round((todayStats.dayTotal / (goals.pagesPerDay || 1)) * 100), 100);
+      const progressMonth = Math.min(Math.round((booksCompletedThisMonth / (goals.booksPerMonth || 1)) * 100), 100);
+      const progressYear = Math.min(Math.round((booksCompletedThisYear / (goals.booksPerYear || 1)) * 100), 100);
+
+      return (
+        <div className="wishlist-page" style={{ color: '#fff' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '25px', borderBottom: '1px solid rgba(214,180,125,0.1)', paddingBottom: '15px' }}>
+            <div>
+              <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)', fontSize: '24px', margin: '0 0 5px 0', letterSpacing: '1px' }}>🎯 METAS</h2>
+              <p style={{ color: 'var(--muted)', fontSize: '13px', margin: 0 }}>Acompanhe suas metas de leitura e os livros que quer viver antes dos 30.</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '18px', marginBottom: '24px' }}>
+            <div className="card" style={{ padding: '18px', background: 'rgba(28,18,40,0.6)', border: '1px solid rgba(214,180,125,0.12)', borderRadius: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <h3 style={{ margin: 0, fontFamily: 'Cinzel, serif', color: 'var(--gold-soft)' }}>📖 Páginas por dia</h3>
+                <span style={{ color: '#62ffb0', fontWeight: 'bold' }}>{todayStats.dayTotal}/{goals.pagesPerDay}</span>
+              </div>
+              <p style={{ color: 'var(--muted)', fontSize: '13px', margin: '0 0 10px 0' }}>Meta diária para manter o ritmo.</p>
+              <div className="progress-container" style={{ height: '8px', marginBottom: '8px' }}>
+                <div className="progress-bar" style={{ width: `${progressPages}%`, background: 'linear-gradient(90deg, #8c62ff, #62ffb0)' }}></div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--muted)' }}>
+                <span>{progressPages}% concluído</span>
+                <span>{todayStats.dayTotal} pág. hoje</span>
+              </div>
+            </div>
+
+            <div className="card" style={{ padding: '18px', background: 'rgba(28,18,40,0.6)', border: '1px solid rgba(214,180,125,0.12)', borderRadius: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <h3 style={{ margin: 0, fontFamily: 'Cinzel, serif', color: 'var(--gold-soft)' }}>📚 Livros por mês</h3>
+                <span style={{ color: '#ffd36e', fontWeight: 'bold' }}>{booksCompletedThisMonth}/{goals.booksPerMonth}</span>
+              </div>
+              <p style={{ color: 'var(--muted)', fontSize: '13px', margin: '0 0 10px 0' }}>Meta para fechar o mês com boa leitura.</p>
+              <div className="progress-container" style={{ height: '8px', marginBottom: '8px' }}>
+                <div className="progress-bar" style={{ width: `${progressMonth}%`, background: 'linear-gradient(90deg, #ffd36e, #ff9f43)' }}></div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--muted)' }}>
+                <span>{progressMonth}% concluído</span>
+                <span>{booksCompletedThisMonth} livros</span>
+              </div>
+            </div>
+
+            <div className="card" style={{ padding: '18px', background: 'rgba(28,18,40,0.6)', border: '1px solid rgba(214,180,125,0.12)', borderRadius: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <h3 style={{ margin: 0, fontFamily: 'Cinzel, serif', color: 'var(--gold-soft)' }}>✨ Livros por ano</h3>
+                <span style={{ color: '#8c62ff', fontWeight: 'bold' }}>{booksCompletedThisYear}/{goals.booksPerYear}</span>
+              </div>
+              <p style={{ color: 'var(--muted)', fontSize: '13px', margin: '0 0 10px 0' }}>Uma meta mais longa para o seu ciclo literário.</p>
+              <div className="progress-container" style={{ height: '8px', marginBottom: '8px' }}>
+                <div className="progress-bar" style={{ width: `${progressYear}%`, background: 'linear-gradient(90deg, #8c62ff, #62ffb0)' }}></div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--muted)' }}>
+                <span>{progressYear}% concluído</span>
+                <span>{booksCompletedThisYear} livros</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: '20px', background: 'rgba(20,13,30,0.8)', border: '1px solid rgba(214,180,125,0.14)', borderRadius: '18px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '10px', flexWrap: 'wrap' }}>
+              <div>
+                <h3 style={{ margin: 0, fontFamily: 'Cinzel, serif', color: 'var(--gold)' }}>30 ANTES DOS 30 ✨</h3>
+                <p style={{ color: 'var(--muted)', fontSize: '13px', margin: '4px 0 0 0' }}>Adicione os livros que você quer ler antes de completar 30 anos.</p>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <input type="number" value={goals.pagesPerDay} onChange={(e) => setGoals({ ...goals, pagesPerDay: parseInt(e.target.value) || 0 })} style={{ width: '70px', padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px' }} />
+                <input type="number" value={goals.booksPerMonth} onChange={(e) => setGoals({ ...goals, booksPerMonth: parseInt(e.target.value) || 0 })} style={{ width: '70px', padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px' }} />
+                <input type="number" value={goals.booksPerYear} onChange={(e) => setGoals({ ...goals, booksPerYear: parseInt(e.target.value) || 0 })} style={{ width: '70px', padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px' }} />
+              </div>
+            </div>
+
+            <form onSubmit={addBeforeThirtyBook} style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+              <input type="text" value={beforeThirtyForm} onChange={(e) => setBeforeThirtyForm(e.target.value)} placeholder="Adicione um livro para a lista" style={{ flex: 1, minWidth: '240px', padding: '10px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '8px' }} />
+              <button type="submit" style={{ padding: '10px 16px', background: 'linear-gradient(135deg, #8c62ff, #62ffb0)', color: '#0c0814', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>+ Adicionar</button>
+            </form>
+
+            <div style={{ display: 'grid', gap: '10px' }}>
+              {beforeThirtyBooks.length > 0 ? beforeThirtyBooks.map((book, index) => (
+                <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(214,180,125,0.08)' }}>
+                  <span style={{ color: 'var(--gold-soft)' }}>{book}</span>
+                  <button onClick={() => removeBeforeThirtyBook(index)} style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer', fontSize: '14px' }}>✕</button>
+                </div>
+              )) : (
+                <p style={{ color: 'var(--muted)', margin: 0 }}>Sua lista ainda está em branco. Que tal adicionar o primeiro livro?</p>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // =========================================
     // PÁGINA: MINHA WISHLIST (DESIGN DA FOTO)
     // =========================================
@@ -1072,6 +1218,7 @@ function App() {
         <button onClick={() => setPage("leituras")} style={{ fontWeight: page === "leituras" ? "bold" : "normal" }}>📚 Painel Geral</button>
         <button onClick={() => setPage("registro_leituras")} style={{ fontWeight: page === "registro_leituras" ? "bold" : "normal" }}>✨ Registro de Leituras</button>
         <button onClick={() => setPage("wishlist")} style={{ fontWeight: page === "wishlist" ? "bold" : "normal" }}>⭐ Wishlist</button>
+        <button onClick={() => setPage("metas")} style={{ fontWeight: page === "metas" ? "bold" : "normal" }}>🎯 Metas</button>
         
         <button onClick={() => { setOpenPasswordModal(true); setPasswordStatusMsg(""); }} className="btn-change-pass-sidebar" style={{ marginTop: 'auto', background: 'rgba(214,180,125,0.05)', border: '1px dashed rgba(214,180,125,0.2)' }}>🔑 Alterar Senha</button>
         <button onClick={handleLogout} className="btn-logout-sidebar" style={{ background: '#321d22', marginTop: '10px' }}>🚪 Fechar Círculo (Sair)</button>
