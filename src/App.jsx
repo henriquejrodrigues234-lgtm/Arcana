@@ -957,13 +957,13 @@ function App() {
         if (!book.endDate) return false;
         const endDate = new Date(book.endDate + "T12:00:00");
         return endDate.getMonth() === now.getMonth() && endDate.getFullYear() === now.getFullYear();
-      }).length;
+      }).length + beforeThirtyBooks.filter((book) => book.read).length;
       const booksCompletedThisYear = books.filter((book) => {
         if (book.status !== "lido") return false;
         if (!book.endDate) return false;
         const endDate = new Date(book.endDate + "T12:00:00");
         return endDate.getFullYear() === now.getFullYear();
-      }).length;
+      }).length + beforeThirtyBooks.filter((book) => book.read).length;
 
       const progressPages = Math.min(Math.round((todayStats.dayTotal / (goals.pagesPerDay || 1)) * 100), 100);
       const progressMonth = Math.min(Math.round((booksCompletedThisMonth / (goals.booksPerMonth || 1)) * 100), 100);
