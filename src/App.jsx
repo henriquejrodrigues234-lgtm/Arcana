@@ -952,18 +952,26 @@ function App() {
     if (page === "metas") {
       const todayStats = getStatsByPeriod();
       const now = new Date();
-      const booksCompletedThisMonth = books.filter((book) => {
+      const completedBooksFromAcervo = books.filter((book) => {
         if (book.status !== "lido") return false;
         if (!book.endDate) return false;
         const endDate = new Date(book.endDate + "T12:00:00");
         return endDate.getMonth() === now.getMonth() && endDate.getFullYear() === now.getFullYear();
-      }).length + beforeThirtyBooks.filter((book) => book.read).length;
-      const booksCompletedThisYear = books.filter((book) => {
+      }).length;
+      const completedBooksFromYear = books.filter((book) => {
         if (book.status !== "lido") return false;
         if (!book.endDate) return false;
         const endDate = new Date(book.endDate + "T12:00:00");
         return endDate.getFullYear() === now.getFullYear();
-      }).length + beforeThirtyBooks.filter((book) => book.read).length;
+      }).length;
+      const booksCompletedThisMonth = completedBooksFromAcervo + beforeThirtyBooks.filter((book) => book.read).length + readingLogs.filter((log) => {
+        const logDate = new Date(log.logged_at);
+        return logDate.getMonth() === now.getMonth() && logDate.getFullYear() === now.getFullYear();
+      }).length;
+      const booksCompletedThisYear = completedBooksFromYear + beforeThirtyBooks.filter((book) => book.read).length + readingLogs.filter((log) => {
+        const logDate = new Date(log.logged_at);
+        return logDate.getFullYear() === now.getFullYear();
+      }).length;
 
       const progressPages = Math.min(Math.round((todayStats.dayTotal / (goals.pagesPerDay || 1)) * 100), 100);
       const progressMonth = Math.min(Math.round((booksCompletedThisMonth / (goals.booksPerMonth || 1)) * 100), 100);
