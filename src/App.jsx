@@ -985,6 +985,10 @@ function App() {
                 <span>{progressPages}% concluído</span>
                 <span>{todayStats.dayTotal} pág. hoje</span>
               </div>
+              <div style={{ marginTop: '10px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--gold-soft)', marginBottom: '5px' }}>Meta diária</label>
+                <input type="number" min="0" value={goals.pagesPerDay} onChange={(e) => handleGoalChange('pagesPerDay', e.target.value)} style={{ width: '100%', padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px' }} />
+              </div>
             </div>
 
             <div className="card" style={{ padding: '18px', background: 'rgba(28,18,40,0.6)', border: '1px solid rgba(214,180,125,0.12)', borderRadius: '16px' }}>
@@ -1000,6 +1004,10 @@ function App() {
                 <span>{progressMonth}% concluído</span>
                 <span>{booksCompletedThisMonth} livros</span>
               </div>
+              <div style={{ marginTop: '10px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--gold-soft)', marginBottom: '5px' }}>Meta mensal</label>
+                <input type="number" min="0" value={goals.booksPerMonth} onChange={(e) => handleGoalChange('booksPerMonth', e.target.value)} style={{ width: '100%', padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px' }} />
+              </div>
             </div>
 
             <div className="card" style={{ padding: '18px', background: 'rgba(28,18,40,0.6)', border: '1px solid rgba(214,180,125,0.12)', borderRadius: '16px' }}>
@@ -1014,6 +1022,10 @@ function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--muted)' }}>
                 <span>{progressYear}% concluído</span>
                 <span>{booksCompletedThisYear} livros</span>
+              </div>
+              <div style={{ marginTop: '10px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--gold-soft)', marginBottom: '5px' }}>Meta anual</label>
+                <input type="number" min="0" value={goals.booksPerYear} onChange={(e) => handleGoalChange('booksPerYear', e.target.value)} style={{ width: '100%', padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px' }} />
               </div>
             </div>
           </div>
