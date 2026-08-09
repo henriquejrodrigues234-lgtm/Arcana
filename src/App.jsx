@@ -337,6 +337,14 @@ function App() {
     setEditingId(null);
   }
 
+  function handleGoalChange(key, value) {
+    const numericValue = parseInt(value, 10);
+    setGoals((prev) => ({
+      ...prev,
+      [key]: Number.isNaN(numericValue) ? 0 : Math.max(0, numericValue)
+    }));
+  }
+
   // =========================================
   // METODOS DA WISHLIST (NOVO)
   // =========================================
@@ -975,6 +983,11 @@ function App() {
                 <span>{progressPages}% concluído</span>
                 <span>{todayStats.dayTotal} pág. hoje</span>
               </div>
+              <div style={{ display: 'flex', gap: '6px', marginTop: '12px', alignItems: 'center' }}>
+                <button onClick={() => handleGoalChange('pagesPerDay', (goals.pagesPerDay || 0) - 1)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid rgba(214,180,125,0.2)', background: '#130b1e', color: '#fff', cursor: 'pointer' }}>−</button>
+                <input type="number" min="0" value={goals.pagesPerDay} onChange={(e) => handleGoalChange('pagesPerDay', e.target.value)} style={{ flex: 1, padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px', textAlign: 'center' }} />
+                <button onClick={() => handleGoalChange('pagesPerDay', (goals.pagesPerDay || 0) + 1)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid rgba(214,180,125,0.2)', background: '#130b1e', color: '#fff', cursor: 'pointer' }}>+</button>
+              </div>
             </div>
 
             <div className="card" style={{ padding: '18px', background: 'rgba(28,18,40,0.6)', border: '1px solid rgba(214,180,125,0.12)', borderRadius: '16px' }}>
@@ -990,6 +1003,11 @@ function App() {
                 <span>{progressMonth}% concluído</span>
                 <span>{booksCompletedThisMonth} livros</span>
               </div>
+              <div style={{ display: 'flex', gap: '6px', marginTop: '12px', alignItems: 'center' }}>
+                <button onClick={() => handleGoalChange('booksPerMonth', (goals.booksPerMonth || 0) - 1)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid rgba(214,180,125,0.2)', background: '#130b1e', color: '#fff', cursor: 'pointer' }}>−</button>
+                <input type="number" min="0" value={goals.booksPerMonth} onChange={(e) => handleGoalChange('booksPerMonth', e.target.value)} style={{ flex: 1, padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px', textAlign: 'center' }} />
+                <button onClick={() => handleGoalChange('booksPerMonth', (goals.booksPerMonth || 0) + 1)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid rgba(214,180,125,0.2)', background: '#130b1e', color: '#fff', cursor: 'pointer' }}>+</button>
+              </div>
             </div>
 
             <div className="card" style={{ padding: '18px', background: 'rgba(28,18,40,0.6)', border: '1px solid rgba(214,180,125,0.12)', borderRadius: '16px' }}>
@@ -1004,6 +1022,11 @@ function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--muted)' }}>
                 <span>{progressYear}% concluído</span>
                 <span>{booksCompletedThisYear} livros</span>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', marginTop: '12px', alignItems: 'center' }}>
+                <button onClick={() => handleGoalChange('booksPerYear', (goals.booksPerYear || 0) - 1)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid rgba(214,180,125,0.2)', background: '#130b1e', color: '#fff', cursor: 'pointer' }}>−</button>
+                <input type="number" min="0" value={goals.booksPerYear} onChange={(e) => handleGoalChange('booksPerYear', e.target.value)} style={{ flex: 1, padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px', textAlign: 'center' }} />
+                <button onClick={() => handleGoalChange('booksPerYear', (goals.booksPerYear || 0) + 1)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid rgba(214,180,125,0.2)', background: '#130b1e', color: '#fff', cursor: 'pointer' }}>+</button>
               </div>
             </div>
           </div>
