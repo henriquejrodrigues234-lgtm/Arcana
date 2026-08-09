@@ -90,6 +90,7 @@ function App() {
   });
   const [beforeThirtyBooks, setBeforeThirtyBooks] = useState([]);
   const [beforeThirtyForm, setBeforeThirtyForm] = useState("");
+  const [openBeforeThirtyModal, setOpenBeforeThirtyModal] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -498,6 +499,7 @@ function App() {
     if (!title) return;
     setBeforeThirtyBooks([...beforeThirtyBooks, title]);
     setBeforeThirtyForm("");
+    setOpenBeforeThirtyModal(false);
   }
 
   function removeBeforeThirtyBook(index) {
@@ -983,11 +985,6 @@ function App() {
                 <span>{progressPages}% concluído</span>
                 <span>{todayStats.dayTotal} pág. hoje</span>
               </div>
-              <div style={{ display: 'flex', gap: '6px', marginTop: '12px', alignItems: 'center' }}>
-                <button onClick={() => handleGoalChange('pagesPerDay', (goals.pagesPerDay || 0) - 1)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid rgba(214,180,125,0.2)', background: '#130b1e', color: '#fff', cursor: 'pointer' }}>−</button>
-                <input type="number" min="0" value={goals.pagesPerDay} onChange={(e) => handleGoalChange('pagesPerDay', e.target.value)} style={{ flex: 1, padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px', textAlign: 'center' }} />
-                <button onClick={() => handleGoalChange('pagesPerDay', (goals.pagesPerDay || 0) + 1)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid rgba(214,180,125,0.2)', background: '#130b1e', color: '#fff', cursor: 'pointer' }}>+</button>
-              </div>
             </div>
 
             <div className="card" style={{ padding: '18px', background: 'rgba(28,18,40,0.6)', border: '1px solid rgba(214,180,125,0.12)', borderRadius: '16px' }}>
@@ -1002,11 +999,6 @@ function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--muted)' }}>
                 <span>{progressMonth}% concluído</span>
                 <span>{booksCompletedThisMonth} livros</span>
-              </div>
-              <div style={{ display: 'flex', gap: '6px', marginTop: '12px', alignItems: 'center' }}>
-                <button onClick={() => handleGoalChange('booksPerMonth', (goals.booksPerMonth || 0) - 1)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid rgba(214,180,125,0.2)', background: '#130b1e', color: '#fff', cursor: 'pointer' }}>−</button>
-                <input type="number" min="0" value={goals.booksPerMonth} onChange={(e) => handleGoalChange('booksPerMonth', e.target.value)} style={{ flex: 1, padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px', textAlign: 'center' }} />
-                <button onClick={() => handleGoalChange('booksPerMonth', (goals.booksPerMonth || 0) + 1)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid rgba(214,180,125,0.2)', background: '#130b1e', color: '#fff', cursor: 'pointer' }}>+</button>
               </div>
             </div>
 
@@ -1023,11 +1015,6 @@ function App() {
                 <span>{progressYear}% concluído</span>
                 <span>{booksCompletedThisYear} livros</span>
               </div>
-              <div style={{ display: 'flex', gap: '6px', marginTop: '12px', alignItems: 'center' }}>
-                <button onClick={() => handleGoalChange('booksPerYear', (goals.booksPerYear || 0) - 1)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid rgba(214,180,125,0.2)', background: '#130b1e', color: '#fff', cursor: 'pointer' }}>−</button>
-                <input type="number" min="0" value={goals.booksPerYear} onChange={(e) => handleGoalChange('booksPerYear', e.target.value)} style={{ flex: 1, padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px', textAlign: 'center' }} />
-                <button onClick={() => handleGoalChange('booksPerYear', (goals.booksPerYear || 0) + 1)} style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid rgba(214,180,125,0.2)', background: '#130b1e', color: '#fff', cursor: 'pointer' }}>+</button>
-              </div>
             </div>
           </div>
 
@@ -1037,17 +1024,8 @@ function App() {
                 <h3 style={{ margin: 0, fontFamily: 'Cinzel, serif', color: 'var(--gold)' }}>30 ANTES DOS 30 ✨</h3>
                 <p style={{ color: 'var(--muted)', fontSize: '13px', margin: '4px 0 0 0' }}>Adicione os livros que você quer ler antes de completar 30 anos.</p>
               </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <input type="number" value={goals.pagesPerDay} onChange={(e) => setGoals({ ...goals, pagesPerDay: parseInt(e.target.value) || 0 })} style={{ width: '70px', padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px' }} />
-                <input type="number" value={goals.booksPerMonth} onChange={(e) => setGoals({ ...goals, booksPerMonth: parseInt(e.target.value) || 0 })} style={{ width: '70px', padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px' }} />
-                <input type="number" value={goals.booksPerYear} onChange={(e) => setGoals({ ...goals, booksPerYear: parseInt(e.target.value) || 0 })} style={{ width: '70px', padding: '8px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '6px' }} />
-              </div>
+              <button onClick={() => { setBeforeThirtyForm(""); setOpenBeforeThirtyModal(true); }} style={{ padding: '10px 16px', background: 'linear-gradient(135deg, #8c62ff, #62ffb0)', color: '#0c0814', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>+ Adicionar</button>
             </div>
-
-            <form onSubmit={addBeforeThirtyBook} style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
-              <input type="text" value={beforeThirtyForm} onChange={(e) => setBeforeThirtyForm(e.target.value)} placeholder="Adicione um livro para a lista" style={{ flex: 1, minWidth: '240px', padding: '10px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '8px' }} />
-              <button type="submit" style={{ padding: '10px 16px', background: 'linear-gradient(135deg, #8c62ff, #62ffb0)', color: '#0c0814', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>+ Adicionar</button>
-            </form>
 
             <div style={{ display: 'grid', gap: '10px' }}>
               {beforeThirtyBooks.length > 0 ? beforeThirtyBooks.map((book, index) => (
@@ -1376,6 +1354,23 @@ function App() {
       {/* =======================================================
           NOVO: MODAL DA WISHLIST (FIEL À SEGUNDA FOTO DA IMAGEM)
           ======================================================= */}
+      {openBeforeThirtyModal && (
+        <div className="modal-overlay" onClick={() => { setBeforeThirtyForm(""); setOpenBeforeThirtyModal(false); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', padding: '24px', background: '#1c122c', border: '1px solid rgba(214,180,125,0.2)', borderRadius: '14px', position: 'relative' }}>
+            <button onClick={() => { setBeforeThirtyForm(""); setOpenBeforeThirtyModal(false); }} style={{ position: 'absolute', right: '20px', top: '20px', background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+            <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)', margin: '0 0 8px 0', fontSize: '20px' }}>✦ Adicionar livro</h2>
+            <p style={{ color: 'var(--muted)', fontSize: '13px', marginBottom: '16px' }}>Escolha o próximo livro da sua lista antes dos 30.</p>
+            <form onSubmit={addBeforeThirtyBook} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <input type="text" value={beforeThirtyForm} onChange={(e) => setBeforeThirtyForm(e.target.value)} placeholder="Nome do livro" style={{ padding: '10px', background: '#130b1e', border: '1px solid rgba(214,180,125,0.2)', color: '#fff', borderRadius: '8px' }} />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button type="button" onClick={() => { setBeforeThirtyForm(""); setOpenBeforeThirtyModal(false); }} style={{ background: 'transparent', border: '1px solid rgba(214,180,125,0.3)', color: 'var(--gold-soft)' }}>Cancelar</button>
+                <button type="submit" style={{ background: 'linear-gradient(135deg, #8c62ff, #62ffb0)', color: '#0c0814', fontWeight: 'bold', padding: '10px 16px' }}>Salvar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {openWishlistModal && (
         <div className="modal-overlay" onClick={() => { resetWishlistForm(); setOpenWishlistModal(false); }}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px', padding: '25px', background: '#1c122c', border: '1px solid rgba(214,180,125,0.2)', borderRadius: '14px', position: 'relative' }}>
