@@ -331,6 +331,32 @@ textarea {
   gap: 24px;
 }
 
+.genres-grid {
+  display: grid;
+  grid-template-columns: 220px 1fr 160px;
+  gap: 18px;
+  align-items: start;
+}
+
+.genres-graphs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.genres-yearly {
+  display: flex;
+  flex-direction: column;
+}
+
+.genres-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+}
+
 .pie-chart-mock {
   width: 140px;
   height: 140px;
