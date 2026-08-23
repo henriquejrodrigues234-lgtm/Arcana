@@ -314,7 +314,7 @@ textarea {
   background: rgba(28, 19, 41, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 20px;
-  padding: 24px;
+  padding: 12px;
 }
 
 .genres-box h3, .current-reading-section h3, .favorites-section h3 {
@@ -328,7 +328,7 @@ textarea {
 .genres-content {
   display: flex;
   align-items: center;
-  gap: 30px;
+  gap: 24px;
 }
 
 .pie-chart-mock {
@@ -357,6 +357,28 @@ textarea {
   flex: 1;
 }
 
+.genres-list > div {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.genres-list > div > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.genres-list > div > span {
+  color: var(--muted);
+  font-size: 13px;
+  margin-left: 12px;
+  min-width: 44px;
+  text-align: right;
+}
 .genres-list li {
   display: flex;
   align-items: center;
@@ -379,17 +401,18 @@ textarea {
   justify-content: center;
   text-align: center;
   border: 1px dashed rgba(216, 180, 125, 0.3);
-  padding: 18px;
+  padding: 12px;
 }
 
 .magic-book-icon {
-  font-size: 32px;
+  font-size: 28px;
 }
 
 .add-book-content h3 {
   font-family: 'Cinzel', serif;
-  margin: 12px 0;
+  margin: 8px 0;
   color: var(--gold);
+  font-size: 18px;
 }
 
 .btn-add-magic {
@@ -813,3 +836,4 @@ textarea {
   margin-bottom: 12px;
   text-transform: capitalize;
 }
+  font-size: 28px;
