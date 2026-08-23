@@ -381,8 +381,29 @@ textarea {
 .genres-list {
   list-style: none;
   flex: 1;
-  max-height: 220px;
+  /* show up to 6 items; scroll for the rest */
+  max-height: calc(6 * 36px);
   overflow-y: auto;
+  padding-right: 6px; /* breathing room for the scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(140,98,255,0.9) rgba(255,255,255,0.02);
+}
+
+/* WebKit scrollbar styling for the genres list */
+.genres-list::-webkit-scrollbar {
+  width: 10px;
+}
+.genres-list::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.02);
+  border-radius: 10px;
+}
+.genres-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(140,98,255,0.95), rgba(214,180,125,0.95));
+  border-radius: 10px;
+  border: 2px solid rgba(0,0,0,0.06);
+}
+.genres-list::-webkit-scrollbar-thumb:hover {
+  filter: brightness(0.95);
 }
 
 .genres-list > div {
