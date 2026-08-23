@@ -796,7 +796,7 @@ function App() {
           </section>
 
           <section className="dashboard-middle">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px', gap: '18px', alignItems: 'start' }}>
               <div className="genres-box">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                   <h3>GÊNEROS LIDOS ✨</h3>
@@ -821,14 +821,11 @@ function App() {
                     </ul>
                   </div>
 
-                  <div className="genres-action">
-                    <button onClick={() => { resetForm(); setOpenModal(true); }} className="btn-add-magic" style={{ padding: '10px 16px', fontSize: '14px' }}>+ Adicionar livro</button>
-                  </div>
                 </div>
               </div>
 
-              <div className="card" style={{ padding: '12px' }}>
-                <h3 style={{ fontFamily: 'Cinzel, serif', fontSize: '16px', color: 'var(--gold-soft)', margin: '0 0 12px 0' }}>Livros por ano</h3>
+              <div className="card yearly-card" style={{ padding: '12px' }}>
+                <h3 style={{ fontFamily: 'Cinzel, serif', fontSize: '16px', color: 'var(--gold-soft)', margin: '0 0 12px 0' }}>📆 Livros por ano</h3>
                 {yearlyCounts.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '320px', overflowY: 'auto' }}>
                     {yearlyCounts.map((y) => (
@@ -844,6 +841,13 @@ function App() {
                 ) : (
                   <p className="empty-text">Nenhum livro finalizado ainda.</p>
                 )}
+              </div>
+
+              <div className="card add-book-card" style={{ padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '22px', marginBottom: '6px' }}>📚</div>
+                  <button onClick={() => { resetForm(); setOpenModal(true); }} className="btn-add-magic" style={{ padding: '10px 14px', fontSize: '14px' }}>+ Adicionar livro</button>
+                </div>
               </div>
             </div>
           </section>
