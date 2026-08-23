@@ -127,13 +127,15 @@ function App() {
           : [];
         setBeforeThirtyBooks(normalized);
       }
-      // load genres (or initialize defaults)
+      // load genres from localStorage first (fast), then try to fetch remote list
       const savedGenres = localStorage.getItem(`arcana-genres-${user.id}`);
       if (savedGenres) {
         try { setGenres(JSON.parse(savedGenres)); } catch (e) { setGenres([]); }
       } else {
         setGenres(["Fantasia", "Ficção Científica", "Romance", "Mistério", "Não-ficção", "Terror", "Biografia", "Outros"]);
       }
+      // try to sync from Supabase (overrides local if available)
+      fetchGenresFromDb();
     } else {
       setBooks([]);
       setReadingLogs([]);
@@ -366,10 +368,39 @@ function App() {
     setNewGenreValue("");
   }
 
-  function addGenre(value) {
+  async function fetchGenresFromDb() {
+    if (!user) return;
+    const { data, error } = await supabase.from('genres').select('name').eq('user_id', user.id).order('created_at', { ascending: false });
+    if (!error && data && data.length > 0) {
+      const names = data.map((g) => g.name).filter(Boolean);
+      if (names.length) {
+        setGenres(names);
+        try { localStorage.setItem(`arcana-genres-${user.id}`, JSON.stringify(names)); } catch (e) { }
+      }
+    }
+  }
+
+  async function saveGenreToDb(name) {
+    const v = (name || '').trim();
+    if (!v) return;
+    // optimistic local update
+    if (!genres.includes(v)) {
+      setGenres((prev) => [v, ...prev]);
+      try { localStorage.setItem(`arcana-genres-${user?.id || 'anon'}`, JSON.stringify([v, ...genres])); } catch (e) { }
+    }
+    if (!user) return;
+    const { data, error } = await supabase.from('genres').insert([{ user_id: user.id, name: v }]).select();
+    if (!error && data && data[0]) {
+      const inserted = data[0].name;
+      if (!genres.includes(inserted)) setGenres((prev) => [inserted, ...prev]);
+      try { localStorage.setItem(`arcana-genres-${user.id}`, JSON.stringify([inserted, ...genres])); } catch (e) { }
+    }
+  }
+
+  async function addGenre(value) {
     const v = (value || newGenreValue || "").trim();
     if (!v) return;
-    if (!genres.includes(v)) setGenres([v, ...genres]);
+    await saveGenreToDb(v);
     setForm({ ...form, genre: v });
     setShowNewGenreInput(false);
     setNewGenreValue("");
@@ -599,6 +630,18 @@ function App() {
     })).sort((a, b) => b.count - a.count);
   }
 
+  function getYearlyReadCounts() {
+    const counts = {};
+    books.forEach((book) => {
+      const d = book.end_date || book.endDate || book.endDate;
+      if (!d) return;
+      const yr = new Date(d).getFullYear();
+      if (!yr || Number.isNaN(yr)) return;
+      counts[yr] = (counts[yr] || 0) + 1;
+    });
+    return Object.keys(counts).map(y => ({ year: parseInt(y, 10), count: counts[y] })).sort((a, b) => b.year - a.year);
+  }
+
   function generatePieGradient(genreData) {
     if (genreData.length === 0) return "#444";
     let currentAngle = 0;
@@ -718,6 +761,8 @@ function App() {
 
       const genreData = getGenreData();
       const pieGradient = generatePieGradient(genreData);
+      const yearlyCounts = getYearlyReadCounts();
+      const maxYearCount = yearlyCounts.length ? Math.max(...yearlyCounts.map(y => y.count)) : 1;
       const { dayTotal, weekTotal, monthTotal } = getStatsByPeriod();
 
       const currentBookFeatured = lendoAgora.length > 0 ? lendoAgora[currentReadingIndex] : null;
@@ -769,6 +814,24 @@ function App() {
                     <p className="empty-text">Adicione livros para ver o gráfico.</p>
                   )}
                 </ul>
+                <div style={{ marginTop: '12px', width: '100%' }}>
+                  <h4 style={{ margin: '6px 0', fontSize: '13px', color: 'var(--gold-soft)' }}>Livros por ano</h4>
+                  {yearlyCounts.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '160px', overflowY: 'auto' }}>
+                      {yearlyCounts.map((y) => (
+                        <div key={y.year} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ width: '60px', color: 'var(--muted)' }}>{y.year}</div>
+                          <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', height: '12px', borderRadius: '8px', overflow: 'hidden' }}>
+                            <div style={{ width: `${Math.round((y.count / maxYearCount) * 100)}%`, height: '100%', background: 'linear-gradient(90deg,#8c62ff,#62ffb0)' }}></div>
+                          </div>
+                          <div style={{ width: '36px', textAlign: 'right', color: 'var(--muted)' }}>{y.count}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="empty-text">Nenhum livro finalizado ainda.</p>
+                  )}
+                </div>
               </div>
             </div>
 
