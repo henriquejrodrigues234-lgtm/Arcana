@@ -1168,6 +1168,10 @@ function App() {
       const todayStats = getStatsByPeriod();
       const now = new Date();
       const booksById = new Map(books.map((book) => [String(book.id), book]));
+        const totalBeforeList = beforeThirtyBooks.length;
+        const readBeforeCount = beforeThirtyBooks.filter(b => b.read).length;
+        const pctReadBefore = totalBeforeList > 0 ? Math.round((readBeforeCount / totalBeforeList) * 100) : 0;
+        const pctRemainingBefore = 100 - pctReadBefore;
       const completedBooksFromAcervo = books.filter((book) => {
         if (book.status !== "lido") return false;
         if (!book.endDate) return false;
@@ -1278,7 +1282,22 @@ function App() {
             </div>
 
             <div style={{ display: 'grid', gap: '10px' }}>
-              {beforeThirtyBooks.length > 0 ? beforeThirtyBooks.map((book, index) => (
+                <div style={{ marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontSize: '12px', color: 'var(--muted)' }}>Lidos</p>
+                      <h3 style={{ margin: '6px 0 0 0', color: '#62ffb0', fontFamily: 'Cinzel, serif' }}>{readBeforeCount}/{totalBeforeList} ({pctReadBefore}%)</h3>
+                    </div>
+                    <div style={{ flex: 1, textAlign: 'right' }}>
+                      <p style={{ margin: 0, fontSize: '12px', color: 'var(--muted)' }}>Faltam</p>
+                      <h3 style={{ margin: '6px 0 0 0', color: '#ffd36e', fontFamily: 'Cinzel, serif' }}>{totalBeforeList - readBeforeCount}/{totalBeforeList} ({pctRemainingBefore}%)</h3>
+                    </div>
+                  </div>
+                  <div className="progress-container" style={{ height: '8px', marginTop: '10px' }}>
+                    <div className="progress-bar" style={{ width: `${pctReadBefore}%`, background: 'linear-gradient(90deg, #62ffb0, #8c62ff)' }}></div>
+                  </div>
+                </div>
+                {beforeThirtyBooks.length > 0 ? beforeThirtyBooks.map((book, index) => (
                 <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(214,180,125,0.08)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
                     {book.cover ? <img src={book.cover} alt={book.title} style={{ width: '44px', height: '64px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(214,180,125,0.15)' }} /> : <div style={{ width: '44px', height: '64px', borderRadius: '6px', background: 'rgba(214,180,125,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>📖</div>}
