@@ -797,7 +797,12 @@ function App() {
 
           <section className="dashboard-middle">
             <div className="genres-box">
-              <h3>GÊNEROS LIDOS ✨</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <h3>GÊNEROS LIDOS ✨</h3>
+                <div>
+                  <button onClick={() => { resetForm(); setOpenModal(true); }} className="btn-add-magic" style={{ padding: '8px 12px', fontSize: '13px' }}>+ Adicionar livro</button>
+                </div>
+              </div>
               <div className="genres-content">
                 <div className="pie-chart-mock" style={{ background: pieGradient }}><div className="inner-circle">🔮</div></div>
                 <ul className="genres-list">
@@ -833,14 +838,6 @@ function App() {
                     <p className="empty-text">Nenhum livro finalizado ainda.</p>
                   )}
                 </div>
-              </div>
-            </div>
-
-            <div className="add-book-box">
-              <div className="add-book-content">
-                <span className="magic-book-icon">📖✨</span>
-                <h3>Adicionar novo livro</h3>
-                <button onClick={() => { resetForm(); setOpenModal(true); }} className="btn-add-magic">+ Adicionar livro</button>
               </div>
             </div>
           </section>
