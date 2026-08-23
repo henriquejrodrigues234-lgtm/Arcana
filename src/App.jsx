@@ -25,6 +25,8 @@ function App() {
   // UI & NAV STATE
   // =========================
   const [page, setPage] = useState("leituras");
+  const [digitalItems, setDigitalItems] = useState([]);
+  const [digitalForm, setDigitalForm] = useState({ title: "", author: "", format: "audio", source: "", cover: "", notes: "", consumed: false, consumed_at: null });
   const [books, setBooks] = useState([]);
   const [booksLoading, setBooksLoading] = useState(false);
   const [openModal, setOpenModal] = useState(false);
@@ -139,6 +141,12 @@ function App() {
       }
       // try to sync from Supabase (overrides local if available)
       fetchGenresFromDb();
+      // load digital items (local first)
+      try {
+        const savedDigital = localStorage.getItem(`arcana-digital-${user.id}`);
+        if (savedDigital) setDigitalItems(JSON.parse(savedDigital));
+      } catch (e) {}
+      fetchDigitalFromDb();
     } else {
       setBooks([]);
       setReadingLogs([]);
@@ -146,6 +154,8 @@ function App() {
       setGoals({ pagesPerDay: 30, booksPerMonth: 2, booksPerYear: 24 });
       setBeforeThirtyBooks([]);
       setBeforeThirtyForm({ title: "", author: "", cover: "", read: false });
+      setDigitalItems([]);
+      setDigitalForm({ title: "", author: "", format: "audio", source: "", cover: "", notes: "", consumed: false });
     }
   }, [user]);
 
@@ -159,6 +169,11 @@ function App() {
     if (!user) return;
     localStorage.setItem(`arcana-goals-${user.id}`, JSON.stringify(goals));
   }, [user, goals]);
+
+  useEffect(() => {
+    if (!user) return;
+    try { localStorage.setItem(`arcana-digital-${user.id}`, JSON.stringify(digitalItems)); } catch (e) {}
+  }, [user, digitalItems]);
 
   useEffect(() => {
     if (!user) return;
@@ -721,6 +736,92 @@ function App() {
         }
       }
     } catch (e) {}
+  }
+
+  // digital/audio items helpers
+  async function fetchDigitalFromDb() {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase.from('digital_items').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        setDigitalItems(data);
+        try { localStorage.setItem(`arcana-digital-${user.id}`, JSON.stringify(data)); } catch (e) {}
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  async function addDigitalItem(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const title = (digitalForm.title || '').trim();
+    if (!title) return;
+    const payload = {
+      user_id: user ? user.id : null,
+      title,
+      author: digitalForm.author || '',
+      format: digitalForm.format || 'audio',
+      source: digitalForm.source || '',
+      cover: digitalForm.cover || null,
+      notes: digitalForm.notes || '',
+      consumed: !!digitalForm.consumed,
+      consumed_at: digitalForm.consumed ? (digitalForm.consumed_at || new Date().toISOString().split('T')[0]) : null
+    };
+
+    if (user) {
+      const { data, error } = await supabase.from('digital_items').insert([payload]).select();
+      if (!error && data && data[0]) {
+        setDigitalItems([data[0], ...digitalItems]);
+        try { localStorage.setItem(`arcana-digital-${user.id}`, JSON.stringify([data[0], ...digitalItems])); } catch (e) {}
+      } else {
+        const localItem = { ...payload, id: `local-${Date.now()}` };
+        setDigitalItems([localItem, ...digitalItems]);
+      }
+    } else {
+      const localItem = { ...payload, id: `local-${Date.now()}` };
+      setDigitalItems([localItem, ...digitalItems]);
+    }
+    setDigitalForm({ title: "", author: "", format: "audio", source: "", cover: "", notes: "", consumed: false, consumed_at: null });
+  }
+
+  async function removeDigitalItem(index) {
+    const item = digitalItems[index];
+    if (!item) return;
+    if (item.id && String(item.id).startsWith('local-')) {
+      const updated = digitalItems.filter((_, i) => i !== index);
+      setDigitalItems(updated);
+      try { localStorage.setItem(`arcana-digital-${user.id}`, JSON.stringify(updated)); } catch (e) {}
+      return;
+    }
+    if (item.id) {
+      const { error } = await supabase.from('digital_items').delete().eq('id', item.id);
+      if (!error) {
+        const updated = digitalItems.filter((_, i) => i !== index);
+        setDigitalItems(updated);
+        try { localStorage.setItem(`arcana-digital-${user.id}`, JSON.stringify(updated)); } catch (e) {}
+      }
+    }
+  }
+
+  async function toggleDigitalConsumed(index) {
+    const item = digitalItems[index];
+    if (!item) return;
+    const next = !item.consumed;
+    const consumed_at = next ? new Date().toISOString().split('T')[0] : null;
+    if (item.id && !String(item.id).startsWith('local-')) {
+      const { error } = await supabase.from('digital_items').update({ consumed: next, consumed_at }).eq('id', item.id);
+      if (!error) {
+        const updated = [...digitalItems];
+        updated[index] = { ...updated[index], consumed: next, consumed_at };
+        setDigitalItems(updated);
+        try { localStorage.setItem(`arcana-digital-${user.id}`, JSON.stringify(updated)); } catch (e) {}
+      }
+    } else {
+      const updated = [...digitalItems];
+      updated[index] = { ...updated[index], consumed: next, consumed_at };
+      setDigitalItems(updated);
+      try { localStorage.setItem(`arcana-digital-${user.id}`, JSON.stringify(updated)); } catch (e) {}
+    }
   }
 
   async function toggleBeforeThirtyRead(index) {
@@ -1324,6 +1425,87 @@ function App() {
     }
 
     // =========================================
+    // PÁGINA: ÁUDIOS & LIVROS DIGITAIS
+    // =========================================
+    if (page === "digital") {
+      return (
+        <div className="wishlist-page">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '18px' }}>
+            <div>
+              <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)', margin: 0 }}>🎧 Áudios & Livros Digitais</h2>
+              <p style={{ color: 'var(--muted)', margin: 0 }}>Adicione e gerencie suas mídias em áudio e edições digitais.</p>
+            </div>
+            <button onClick={() => setDigitalForm({ title: "", author: "", format: "audio", source: "", cover: "", notes: "", consumed: false })} className="btn-add-magic">+ Novo</button>
+          </div>
+
+          <div className="card" style={{ padding: '16px', marginBottom: '16px' }}>
+            <form onSubmit={addDigitalItem} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px', gap: '10px', alignItems: 'end' }}>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--muted)' }}>Título</label>
+                <input value={digitalForm.title} onChange={(e) => setDigitalForm({ ...digitalForm, title: e.target.value })} placeholder="Título" />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--muted)' }}>Autor</label>
+                <input value={digitalForm.author} onChange={(e) => setDigitalForm({ ...digitalForm, author: e.target.value })} placeholder="Autor" />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--muted)' }}>Formato</label>
+                <select value={digitalForm.format} onChange={(e) => setDigitalForm({ ...digitalForm, format: e.target.value })}>
+                  <option value="audio">Audiobook</option>
+                  <option value="ebook">E-book</option>
+                </select>
+              </div>
+
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ fontSize: '12px', color: 'var(--muted)' }}>Fonte / Link</label>
+                <input value={digitalForm.source} onChange={(e) => setDigitalForm({ ...digitalForm, source: e.target.value })} placeholder="URL, serviço, caminho" />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--muted)' }}>Capa (URL)</label>
+                <input value={digitalForm.cover} onChange={(e) => setDigitalForm({ ...digitalForm, cover: e.target.value })} placeholder="https://..." />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--muted)' }}>Status</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="button" onClick={() => setDigitalForm({ ...digitalForm, consumed: !digitalForm.consumed })} style={{ padding: '8px 10px' }}>{digitalForm.consumed ? '✓ Consumido' : '○ Não consumido'}</button>
+                  <button type="submit" className="btn-add-magic">Salvar</button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div className="card">
+            <h3 style={{ marginTop: 0, marginBottom: '12px' }}>Sua Biblioteca Digital</h3>
+            {digitalItems.length > 0 ? (
+              <div style={{ display: 'grid', gap: '10px' }}>
+                {digitalItems.map((it, idx) => (
+                  <div key={it.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderRadius: '10px', background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      {it.cover ? <img src={it.cover} alt={it.title} style={{ width: '48px', height: '68px', objectFit: 'cover', borderRadius: '6px' }} /> : <div style={{ width: '48px', height: '68px', borderRadius: '6px', background: 'rgba(214,180,125,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🎧</div>}
+                      <div>
+                        <div style={{ fontWeight: '600', color: 'var(--gold-soft)' }}>{it.title}</div>
+                        <div style={{ fontSize: '13px', color: 'var(--muted)' }}>{it.author} • {it.format}</div>
+                        {it.source && <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{it.source}</div>}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <button onClick={() => toggleDigitalConsumed(idx)} style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)', background: it.consumed ? 'rgba(98,255,176,0.08)' : 'transparent' }}>{it.consumed ? '✓ Consumido' : '○ Marcar'}</button>
+                      <button onClick={() => removeDigitalItem(idx)} style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer' }}>✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: 'var(--muted)' }}>Nenhuma mídia digital adicionada ainda.</p>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================
     // PÁGINA: MINHA WISHLIST (DESIGN DA FOTO)
     // =========================================
     if (page === "wishlist") {
@@ -1501,6 +1683,7 @@ function App() {
         <button onClick={() => setPage("registro_leituras")} style={{ fontWeight: page === "registro_leituras" ? "bold" : "normal" }}>✨ Registro de Leituras</button>
         <button onClick={() => setPage("wishlist")} style={{ fontWeight: page === "wishlist" ? "bold" : "normal" }}>⭐ Wishlist</button>
         <button onClick={() => setPage("metas")} style={{ fontWeight: page === "metas" ? "bold" : "normal" }}>🎯 Metas</button>
+        <button onClick={() => setPage("digital")} style={{ fontWeight: page === "digital" ? "bold" : "normal" }}>🎧 Áudios & Digitais</button>
         
         <button onClick={() => { setOpenPasswordModal(true); setPasswordStatusMsg(""); }} className="btn-change-pass-sidebar" style={{ marginTop: 'auto', background: 'rgba(214,180,125,0.05)', border: '1px dashed rgba(214,180,125,0.2)' }}>🔑 Alterar Senha</button>
         <button onClick={handleLogout} className="btn-logout-sidebar" style={{ background: '#321d22', marginTop: '10px' }}>🚪 Fechar Círculo (Sair)</button>
