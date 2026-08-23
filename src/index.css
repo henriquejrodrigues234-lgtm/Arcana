@@ -317,10 +317,10 @@ textarea {
   margin-bottom: 24px;
 }
 
-.genres-box, .add-book-box {
-  background: rgba(28, 19, 41, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 20px;
+.genres-box {
+  background: rgba(36, 23, 50, .92);
+  border: 1px solid var(--border);
+  border-radius: 22px;
   padding: 12px;
 }
 
