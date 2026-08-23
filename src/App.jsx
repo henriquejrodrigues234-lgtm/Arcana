@@ -97,7 +97,7 @@ function App() {
     booksPerYear: 24
   });
   const [beforeThirtyBooks, setBeforeThirtyBooks] = useState([]);
-  const [beforeThirtyForm, setBeforeThirtyForm] = useState({ title: "", author: "", cover: "", read: false });
+  const [beforeThirtyForm, setBeforeThirtyForm] = useState({ title: "", author: "", cover: "", read: false, read_at: null });
   const [openBeforeThirtyModal, setOpenBeforeThirtyModal] = useState(false);
 
   useEffect(() => {
@@ -127,6 +127,8 @@ function App() {
           ? parsed.map((item) => typeof item === 'string' ? { title: item, author: '', cover: '', read: false } : item)
           : [];
         setBeforeThirtyBooks(normalized);
+        // try to sync remote before-thirty list
+        fetchBeforeThirtyFromDb();
       }
       // load genres from localStorage first (fast), then try to fetch remote list
       const savedGenres = localStorage.getItem(`arcana-genres-${user.id}`);
@@ -275,7 +277,14 @@ function App() {
         await supabase.from("reading_logs").insert([{ user_id: user.id, book_id: selectedBook.id, pages_read: pagesJustRead }]);
         fetchLogs();
       }
-      const updatedBook = { ...selectedBook, current_page: targetPage };
+      let updatedBook = { ...selectedBook, current_page: targetPage };
+      const totalPagesNum = parseInt(selectedBook.pages) || 0;
+      if (totalPagesNum > 0 && targetPage >= totalPagesNum) {
+        // mark as read
+        const end_date = new Date().toISOString().split('T')[0];
+        await supabase.from('books').update({ status: 'lido', end_date }).eq('id', selectedBook.id);
+        updatedBook = { ...updatedBook, status: 'lido', endDate: end_date, end_date };
+      }
       setBooks(books.map(b => b.id === selectedBook.id ? updatedBook : b));
       setSelectedBook(updatedBook);
       setInputPageUpdate("");
@@ -312,7 +321,14 @@ function App() {
 
     if (!logError) {
       await supabase.from("books").update({ current_page: nextPagesTotal }).eq("id", targetBookId);
-      setBooks(books.map(b => b.id === targetBookId ? { ...b, current_page: nextPagesTotal } : b));
+      // if we've completed the book, mark as read and set end_date
+      if (totalBookPages > 0 && nextPagesTotal >= totalBookPages) {
+        const end_date = new Date().toISOString().split('T')[0];
+        await supabase.from('books').update({ status: 'lido', end_date }).eq('id', targetBookId);
+        setBooks(books.map(b => b.id === targetBookId ? { ...b, current_page: nextPagesTotal, status: 'lido', endDate: end_date, end_date } : b));
+      } else {
+        setBooks(books.map(b => b.id === targetBookId ? { ...b, current_page: nextPagesTotal } : b));
+      }
       fetchLogs();
       setQuickLogMsg("🔮 Páginas integradas!");
       setTimeout(() => {
@@ -355,10 +371,13 @@ function App() {
 
   async function updateStatus(id, status, e) {
     if (e) e.stopPropagation();
-    const { error } = await supabase.from("books").update({ status }).eq("id", id);
+    const payload = { status };
+    if (status === 'lido') payload.end_date = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase.from("books").update(payload).eq("id", id).select();
     if (!error) {
-      setBooks(books.map((b) => b.id === id ? { ...b, status } : b));
-      if (selectedBook && selectedBook.id === id) setSelectedBook({ ...selectedBook, status });
+      const updated = data && data[0] ? { ...data[0], startDate: data[0].start_date, endDate: data[0].end_date, current_page: data[0].current_page || 0 } : null;
+      setBooks(books.map((b) => b.id === id ? (updated || { ...b, ...payload }) : b));
+      if (selectedBook && selectedBook.id === id) setSelectedBook(updated || { ...selectedBook, ...payload });
     }
   }
 
@@ -562,18 +581,50 @@ function App() {
     reader.readAsDataURL(file);
   }
 
-  function addBeforeThirtyBook(e) {
+  async function addBeforeThirtyBook(e) {
     e.preventDefault();
     const title = beforeThirtyForm.title.trim();
     const author = beforeThirtyForm.author.trim();
-    if (!title) return;
-    setBeforeThirtyBooks([...beforeThirtyBooks, { title, author, cover: beforeThirtyForm.cover.trim(), read: beforeThirtyForm.read }]);
-    setBeforeThirtyForm({ title: "", author: "", cover: "", read: false });
+    if (!title || !user) return;
+    const payload = {
+      user_id: user.id,
+      title,
+      author,
+      cover: beforeThirtyForm.cover ? beforeThirtyForm.cover.trim() : null,
+      read: !!beforeThirtyForm.read,
+      read_at: beforeThirtyForm.read ? new Date().toISOString().split('T')[0] : null
+    };
+    const { data, error } = await supabase.from('before_thirty').insert([payload]).select();
+    if (!error && data && data[0]) {
+      setBeforeThirtyBooks([data[0], ...beforeThirtyBooks]);
+      try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify([data[0], ...beforeThirtyBooks])); } catch (e) {}
+    } else {
+      // fallback local-only
+      const localItem = { ...payload, id: `local-${Date.now()}` };
+      setBeforeThirtyBooks([localItem, ...beforeThirtyBooks]);
+      try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify([localItem, ...beforeThirtyBooks])); } catch (e) {}
+    }
+    setBeforeThirtyForm({ title: "", author: "", cover: "", read: false, read_at: null });
     setOpenBeforeThirtyModal(false);
   }
 
-  function removeBeforeThirtyBook(index) {
-    setBeforeThirtyBooks(beforeThirtyBooks.filter((_, i) => i !== index));
+  async function removeBeforeThirtyBook(index) {
+    const item = beforeThirtyBooks[index];
+    if (!item) return;
+    if (item.id && String(item.id).startsWith('local-')) {
+      const updated = beforeThirtyBooks.filter((_, i) => i !== index);
+      setBeforeThirtyBooks(updated);
+      try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify(updated)); } catch (e) {}
+      return;
+    }
+    if (item.id) {
+      const { error } = await supabase.from('before_thirty').delete().eq('id', item.id);
+      if (!error) {
+        const updated = beforeThirtyBooks.filter((_, i) => i !== index);
+        setBeforeThirtyBooks(updated);
+        try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify(updated)); } catch (e) {}
+      }
+    }
   }
 
   function getStatsByPeriod() {
@@ -641,6 +692,56 @@ function App() {
       counts[yr] = (counts[yr] || 0) + 1;
     });
     return Object.keys(counts).map(y => ({ year: parseInt(y, 10), count: counts[y] })).sort((a, b) => b.year - a.year);
+  }
+
+  // fetch before_thirty entries from Supabase
+  async function fetchBeforeThirtyFromDb() {
+    if (!user) return;
+    const { data, error } = await supabase.from('before_thirty').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+    if (!error && data && data.length > 0) {
+      setBeforeThirtyBooks(data);
+      try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify(data)); } catch (e) {}
+      return;
+    }
+    // if remote empty but local saved entries exist, try to push them
+    try {
+      const savedLocal = localStorage.getItem(`arcana-before-thirty-${user.id}`);
+      if (savedLocal) {
+        const parsed = JSON.parse(savedLocal);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          for (const item of parsed) {
+            const payload = { user_id: user.id, title: item.title || '', author: item.author || '', cover: item.cover || null, read: !!item.read, read_at: item.read_at || null };
+            await supabase.from('before_thirty').insert([payload]);
+          }
+          const { data: newData } = await supabase.from('before_thirty').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+          if (newData) {
+            setBeforeThirtyBooks(newData);
+            try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify(newData)); } catch (e) {}
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  async function toggleBeforeThirtyRead(index) {
+    const item = beforeThirtyBooks[index];
+    if (!item) return;
+    const nextRead = !item.read;
+    const read_at = nextRead ? new Date().toISOString().split('T')[0] : null;
+    if (item.id && !String(item.id).startsWith('local-')) {
+      const { error } = await supabase.from('before_thirty').update({ read: nextRead, read_at }).eq('id', item.id);
+      if (!error) {
+        const updated = [...beforeThirtyBooks];
+        updated[index] = { ...updated[index], read: nextRead, read_at };
+        setBeforeThirtyBooks(updated);
+        try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify(updated)); } catch (e) {}
+      }
+    } else {
+      const updated = [...beforeThirtyBooks];
+      updated[index] = { ...updated[index], read: nextRead, read_at };
+      setBeforeThirtyBooks(updated);
+      try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify(updated)); } catch (e) {}
+    }
   }
 
   function generatePieGradient(genreData) {
@@ -1079,17 +1180,20 @@ function App() {
         const endDate = new Date(book.endDate + "T12:00:00");
         return endDate.getFullYear() === now.getFullYear();
       }).length;
-      const booksCompletedThisMonth = completedBooksFromAcervo + beforeThirtyBooks.filter((book) => book.read).length + readingLogs.filter((log) => {
-        const currentBook = booksById.get(String(log.book_id));
-        if (!currentBook || currentBook.status !== "lido") return false;
-        const logDate = new Date(log.logged_at);
-        return logDate.getMonth() === now.getMonth() && logDate.getFullYear() === now.getFullYear();
+      const booksCompletedThisMonth = completedBooksFromAcervo + beforeThirtyBooks.filter((book) => {
+        if (!book.read) return false;
+        const dStr = book.read_at || book.readAt || book.readAt || book.readAt;
+        if (!dStr) return true; // if no date, assume included
+        const d = new Date(dStr + (dStr.includes('T') ? '' : 'T12:00:00'));
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       }).length;
-      const booksCompletedThisYear = completedBooksFromYear + beforeThirtyBooks.filter((book) => book.read).length + readingLogs.filter((log) => {
-        const currentBook = booksById.get(String(log.book_id));
-        if (!currentBook || currentBook.status !== "lido") return false;
-        const logDate = new Date(log.logged_at);
-        return logDate.getFullYear() === now.getFullYear();
+
+      const booksCompletedThisYear = completedBooksFromYear + beforeThirtyBooks.filter((book) => {
+        if (!book.read) return false;
+        const dStr = book.read_at || book.readAt || book.readAt || book.readAt;
+        if (!dStr) return true;
+        const d = new Date(dStr + (dStr.includes('T') ? '' : 'T12:00:00'));
+        return d.getFullYear() === now.getFullYear();
       }).length;
 
       const progressPages = Math.min(Math.round((todayStats.dayTotal / (goals.pagesPerDay || 1)) * 100), 100);
@@ -1185,11 +1289,7 @@ function App() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button onClick={() => {
-                      const updated = [...beforeThirtyBooks];
-                      updated[index] = { ...updated[index], read: !updated[index].read };
-                      setBeforeThirtyBooks(updated);
-                    }} style={{ background: book.read ? 'rgba(98,255,176,0.15)' : 'rgba(214,180,125,0.08)', border: '1px solid rgba(214,180,125,0.2)', color: book.read ? '#62ffb0' : 'var(--gold-soft)', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                    <button onClick={() => toggleBeforeThirtyRead(index)} style={{ background: book.read ? 'rgba(98,255,176,0.15)' : 'rgba(214,180,125,0.08)', border: '1px solid rgba(214,180,125,0.2)', color: book.read ? '#62ffb0' : 'var(--gold-soft)', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', fontSize: '11px', whiteSpace: 'nowrap' }}>
                       {book.read ? '✓ Li' : '↺ Não li'}
                     </button>
                     <button onClick={() => removeBeforeThirtyBook(index)} style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer', fontSize: '14px' }}>✕</button>
