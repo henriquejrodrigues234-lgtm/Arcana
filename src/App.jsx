@@ -59,6 +59,13 @@ function App() {
   });
 
   // =========================
+  // GENRES (GÊNEROS) STATE
+  // =========================
+  const [genres, setGenres] = useState([]);
+  const [showNewGenreInput, setShowNewGenreInput] = useState(false);
+  const [newGenreValue, setNewGenreValue] = useState("");
+
+  // =========================
   // STATE DA WISHLIST
   // =========================
   const [wishlistItems, setWishlistItems] = useState([]);
@@ -120,6 +127,13 @@ function App() {
           : [];
         setBeforeThirtyBooks(normalized);
       }
+      // load genres (or initialize defaults)
+      const savedGenres = localStorage.getItem(`arcana-genres-${user.id}`);
+      if (savedGenres) {
+        try { setGenres(JSON.parse(savedGenres)); } catch (e) { setGenres([]); }
+      } else {
+        setGenres(["Fantasia", "Ficção Científica", "Romance", "Mistério", "Não-ficção", "Terror", "Biografia", "Outros"]);
+      }
     } else {
       setBooks([]);
       setReadingLogs([]);
@@ -129,6 +143,12 @@ function App() {
       setBeforeThirtyForm({ title: "", author: "", cover: "", read: false });
     }
   }, [user]);
+
+  // persist genres per user
+  useEffect(() => {
+    if (!user) return;
+    localStorage.setItem(`arcana-genres-${user.id}`, JSON.stringify(genres));
+  }, [user, genres]);
 
   useEffect(() => {
     if (!user) return;
@@ -342,6 +362,17 @@ function App() {
   function resetForm() {
     setForm({ title: "", author: "", publisher: "", rating: 0, favorite: false, pages: "", startDate: "", endDate: "", genre: "", cover: "", summary: "", status: "quero", current_page: 0 });
     setEditingId(null);
+    setShowNewGenreInput(false);
+    setNewGenreValue("");
+  }
+
+  function addGenre(value) {
+    const v = (value || newGenreValue || "").trim();
+    if (!v) return;
+    if (!genres.includes(v)) setGenres([v, ...genres]);
+    setForm({ ...form, genre: v });
+    setShowNewGenreInput(false);
+    setNewGenreValue("");
   }
 
   function handleGoalChange(key, value) {
@@ -1382,7 +1413,24 @@ function App() {
             <input placeholder="Título" value={form.title} onChange={(e)=>setForm({...form,title:e.target.value})}/>
             <input placeholder="Autor" value={form.author} onChange={(e)=>setForm({...form,author:e.target.value})}/>
             <input placeholder="Editora" value={form.publisher} onChange={(e)=>setForm({...form,publisher:e.target.value})}/>
-            <input placeholder="Gênero" value={form.genre} onChange={(e)=>setForm({...form,genre:e.target.value})}/>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <select value={showNewGenreInput ? '__add_new__' : (form.genre || '')} onChange={(e) => {
+                const v = e.target.value;
+                if (v === '__add_new__') { setShowNewGenreInput(true); setForm({ ...form, genre: '' }); }
+                else { setShowNewGenreInput(false); setForm({ ...form, genre: v }); }
+              }} style={{ padding: '8px', background: '#1c1228', color: '#fff', border: '1px solid rgba(214,180,125,0.2)', flex: 1 }}>
+                <option value="">-- Selecione um gênero --</option>
+                {genres.map((g, i) => <option key={i} value={g}>{g}</option>)}
+                <option value="__add_new__">+ Adicionar novo gênero...</option>
+              </select>
+              {showNewGenreInput && (
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <input placeholder="Novo gênero" value={newGenreValue} onChange={(e) => setNewGenreValue(e.target.value)} style={{ padding: '8px' }} />
+                  <button type="button" onClick={() => addGenre()} style={{ padding: '8px', background: 'linear-gradient(135deg, #8c62ff, #62ffb0)', color: '#0c0814', fontWeight: 'bold' }}>Adicionar</button>
+                  <button type="button" onClick={() => { setShowNewGenreInput(false); setNewGenreValue(''); }} style={{ padding: '8px', background: '#444' }}>Cancelar</button>
+                </div>
+              )}
+            </div>
             <input placeholder="Total de Páginas" type="number" value={form.pages} onChange={(e)=>setForm({...form,pages:e.target.value})}/>
             <input placeholder="Página Atual inicial" type="number" value={form.current_page} onChange={(e)=>setForm({...form,current_page:parseInt(e.target.value)||0})}/>
             <p>Classificação</p><Stars value={form.rating} onChange={(n)=>setForm({...form,rating:n})}/>
