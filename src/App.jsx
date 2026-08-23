@@ -796,7 +796,7 @@ function App() {
           </section>
 
           <section className="dashboard-middle">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px', gap: '18px', alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px', gap: '18px', alignItems: 'stretch' }}>
               <div className="genres-box">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                   <h3>GÊNEROS LIDOS ✨</h3>

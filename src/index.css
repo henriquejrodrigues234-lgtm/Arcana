@@ -107,6 +107,13 @@ body {
   transform: translateY(-2px);
 }
 
+/* Ensure the yearly card matches the default card color and border */
+.yearly-card {
+  background: rgba(36, 23, 50, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+}
+
 /* FILAS NETFLIX EM GERAL */
 .netflix-row {
   display: grid;
