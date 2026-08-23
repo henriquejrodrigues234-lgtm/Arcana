@@ -796,52 +796,54 @@ function App() {
           </section>
 
           <section className="dashboard-middle">
-            <div className="genres-box">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                <h3>GÊNEROS LIDOS ✨</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '18px' }}>
+              <div className="genres-box">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                  <h3>GÊNEROS LIDOS ✨</h3>
+                </div>
+                <div className="genres-grid">
+                  <div className="genres-graphs">
+                    <div className="pie-chart-mock" style={{ background: pieGradient }}><div className="inner-circle">🔮</div></div>
+                    <ul className="genres-list">
+                      {genreData.length > 0 ? (
+                        genreData.map((genre, idx) => (
+                          <div key={idx} style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                              <span className="dot" style={{ backgroundColor: genre.color }}></span>
+                              <span>{genre.name}</span>
+                            </div>
+                            <span style={{ color: 'var(--muted)', fontSize: '13px' }}>{genre.percentage}%</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="empty-text">Adicione livros para ver o gráfico.</p>
+                      )}
+                    </ul>
+                  </div>
+
+                  <div className="genres-action">
+                    <button onClick={() => { resetForm(); setOpenModal(true); }} className="btn-add-magic" style={{ padding: '10px 16px', fontSize: '14px' }}>+ Adicionar livro</button>
+                  </div>
+                </div>
               </div>
-              <div className="genres-grid">
-                <div className="genres-graphs">
-                  <div className="pie-chart-mock" style={{ background: pieGradient }}><div className="inner-circle">🔮</div></div>
-                  <ul className="genres-list">
-                    {genreData.length > 0 ? (
-                      genreData.map((genre, idx) => (
-                        <div key={idx} style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center' }}>
-                            <span className="dot" style={{ backgroundColor: genre.color }}></span>
-                            <span>{genre.name}</span>
-                          </div>
-                          <span style={{ color: 'var(--muted)', fontSize: '13px' }}>{genre.percentage}%</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="empty-text">Adicione livros para ver o gráfico.</p>
-                    )}
-                  </ul>
-                </div>
 
-                <div className="genres-yearly">
-                  <h4 style={{ margin: '6px 0 12px 0', fontSize: '13px', color: 'var(--gold-soft)' }}>Livros por ano</h4>
-                  {yearlyCounts.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '260px', overflowY: 'auto' }}>
-                      {yearlyCounts.map((y) => (
-                        <div key={y.year} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '64px', color: 'var(--muted)' }}>{y.year}</div>
-                          <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', height: '12px', borderRadius: '8px', overflow: 'hidden' }}>
-                            <div style={{ width: `${Math.round((y.count / maxYearCount) * 100)}%`, height: '100%', background: 'linear-gradient(90deg,#8c62ff,#62ffb0)' }}></div>
-                          </div>
-                          <div style={{ width: '36px', textAlign: 'right', color: 'var(--muted)' }}>{y.count}</div>
+              <div className="card" style={{ padding: '12px' }}>
+                <h3 style={{ fontFamily: 'Cinzel, serif', fontSize: '16px', color: 'var(--gold-soft)', margin: '0 0 12px 0' }}>Livros por ano</h3>
+                {yearlyCounts.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '320px', overflowY: 'auto' }}>
+                    {yearlyCounts.map((y) => (
+                      <div key={y.year} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '64px', color: 'var(--muted)' }}>{y.year}</div>
+                        <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', height: '12px', borderRadius: '8px', overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.round((y.count / maxYearCount) * 100)}%`, height: '100%', background: 'linear-gradient(90deg,#8c62ff,#62ffb0)' }}></div>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="empty-text">Nenhum livro finalizado ainda.</p>
-                  )}
-                </div>
-
-                <div className="genres-action">
-                  <button onClick={() => { resetForm(); setOpenModal(true); }} className="btn-add-magic" style={{ padding: '10px 16px', fontSize: '14px' }}>+ Adicionar livro</button>
-                </div>
+                        <div style={{ width: '36px', textAlign: 'right', color: 'var(--muted)' }}>{y.count}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="empty-text">Nenhum livro finalizado ainda.</p>
+                )}
               </div>
             </div>
           </section>
