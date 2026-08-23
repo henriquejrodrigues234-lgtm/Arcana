@@ -31,6 +31,7 @@ function App() {
   const [editingId, setEditingId] = useState(null); 
   const [selectedBook, setSelectedBook] = useState(null); 
   const [currentReadingIndex, setCurrentReadingIndex] = useState(0);
+  const [shelfFilter, setShelfFilter] = useState("todos");
 
   // =========================
   // RASTREAMENTO & METAS
@@ -886,6 +887,15 @@ function App() {
 
           <section className="books shelf-section">
   <div className="shelf-header"><h2>MEU ACERVO ✦</h2></div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px', gap: '10px', alignItems: 'center' }}>
+            <label style={{ color: 'var(--muted)', fontSize: '13px' }}>Filtrar:</label>
+            <select value={shelfFilter} onChange={(e) => setShelfFilter(e.target.value)} style={{ width: '160px' }}>
+              <option value="todos">Todos</option>
+              <option value="lido">Lido</option>
+              <option value="lendo">Lendo</option>
+              <option value="quero">Quero</option>
+            </select>
+          </div>
   <div 
     className="netflix-row" 
     style={{
@@ -896,7 +906,10 @@ function App() {
       width: '100%'
     }}
   >
-    {books.length > 0 ? books.map(Card) : <p className="empty-text">Nenhum livro no acervo</p>}
+            {(() => {
+              const filtered = shelfFilter === 'todos' ? books : books.filter(b => b.status === shelfFilter);
+              return filtered.length > 0 ? filtered.map(Card) : <p className="empty-text">Nenhum livro no acervo</p>;
+            })()}
   </div>
 </section>
 

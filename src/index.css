@@ -305,7 +305,7 @@ textarea {
 /* Bloco Central */
 .dashboard-middle {
   display: grid;
-  grid-template-columns: 1.5fr 1fr;
+  grid-template-columns: 1.3fr 0.9fr;
   gap: 20px;
   margin-bottom: 24px;
 }
@@ -332,8 +332,9 @@ textarea {
 }
 
 .pie-chart-mock {
-  width: 120px;
-  height: 120px;
+  width: 140px;
+  height: 140px;
+  flex: 0 0 140px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -341,8 +342,8 @@ textarea {
 }
 
 .inner-circle {
-  width: 50px;
-  height: 50px;
+  width: 60px;
+  height: 60px;
   background: #1c1329;
   border-radius: 50%;
   display: flex;
@@ -378,6 +379,7 @@ textarea {
   justify-content: center;
   text-align: center;
   border: 1px dashed rgba(216, 180, 125, 0.3);
+  padding: 18px;
 }
 
 .magic-book-icon {
