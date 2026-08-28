@@ -808,20 +808,20 @@ function App() {
   function prevReading() {
     const lendo = byStatus("lendo");
     if (!lendo || lendo.length === 0) return;
-    setCurrentReadingIndex((i) => (i - 1 + lendo.length) % lendo.length);
+    setCurrentReadingIndex((i) => (i - 2 + lendo.length) % lendo.length);
   }
 
   function nextReading() {
     const lendo = byStatus("lendo");
     if (!lendo || lendo.length === 0) return;
-    setCurrentReadingIndex((i) => (i + 1) % lendo.length);
+    setCurrentReadingIndex((i) => (i + 2) % lendo.length);
   }
 
   useEffect(() => {
     const lendo = byStatus("lendo");
     if (!lendo || lendo.length === 0) {
       setCurrentReadingIndex(0);
-    } else if (currentReadingIndex > lendo.length - 1) {
+    } else if (currentReadingIndex >= lendo.length) {
       setCurrentReadingIndex(0);
     }
   }, [books]);
@@ -910,8 +910,10 @@ function App() {
       const maxYearCount = yearlyCounts.length ? Math.max(...yearlyCounts.map(y => y.count)) : 1;
       const { dayTotal, weekTotal, monthTotal } = getStatsByPeriod();
 
-      const currentBookFeatured = lendoAgora.length > 0 ? lendoAgora[currentReadingIndex] : null;
-      const currentPct = currentBookFeatured ? calculatePercentage(currentBookFeatured.current_page, currentBookFeatured.pages) : 0;
+      const currentReadingWindow = lendoAgora.length > 0
+        ? Array.from({ length: Math.min(2, lendoAgora.length) }, (_, offset) => lendoAgora[(currentReadingIndex + offset) % lendoAgora.length])
+        : [];
+      const showReadingArrows = lendoAgora.length > 2;
 
       return (
         <>
@@ -999,21 +1001,35 @@ function App() {
           <section className="dashboard-lower">
             <div className="current-reading-section">
               <h3>LENDO AGORA ✨</h3>
-              {currentBookFeatured ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <button onClick={(e) => { e.stopPropagation(); prevReading(); }} style={{ background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '20px', cursor: 'pointer' }}>◀</button>
-                  <div className="current-book-display" onClick={() => handleCardClick(currentBookFeatured)} style={{ cursor: 'pointer' }}>
-                    <img src={currentBookFeatured.cover || "https://via.placeholder.com/120x180"} alt="Capa" />
-                    <div className="current-book-details">
-                      <h4>{currentBookFeatured.title}</h4>
-                      <p>{currentBookFeatured.author}</p>
-                      <div className="progress-container">
-                        <div className="progress-bar" style={{ width: `${currentPct}%` }}></div>
-                      </div>
-                      <span className="progress-text">{currentPct}% concluído ({currentBookFeatured.current_page}/{currentBookFeatured.pages || "?"} pág)</span>
-                    </div>
+              {lendoAgora.length > 0 ? (
+                <div style={{ display: 'flex', alignItems: 'stretch', gap: '12px' }}>
+                  {showReadingArrows && (
+                    <button onClick={(e) => { e.stopPropagation(); prevReading(); }} style={{ background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '20px', cursor: 'pointer', alignSelf: 'center' }}>◀</button>
+                  )}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', flex: 1, minWidth: 0 }}>
+                    {currentReadingWindow.map((book) => {
+                      const pct = calculatePercentage(book.current_page, book.pages);
+
+                      return (
+                        <div key={book.id} className="current-book-display" onClick={() => handleCardClick(book)} style={{ cursor: 'pointer', minWidth: 0, alignItems: 'flex-start' }}>
+                          <img src={book.cover || "https://via.placeholder.com/120x180"} alt="Capa" />
+                          <div className="current-book-details">
+                            <h4>{book.title}</h4>
+                            <p>{book.author}</p>
+                            <div className="progress-container">
+                              <div className="progress-bar" style={{ width: `${pct}%` }}></div>
+                            </div>
+                            <span className="progress-text">{pct}% concluído ({book.current_page}/{book.pages || "?"} pág)</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); nextReading(); }} style={{ background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '20px', cursor: 'pointer' }}>▶</button>
+
+                  {showReadingArrows && (
+                    <button onClick={(e) => { e.stopPropagation(); nextReading(); }} style={{ background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '20px', cursor: 'pointer', alignSelf: 'center' }}>▶</button>
+                  )}
                 </div>
               ) : (
                 <p className="empty-text">Nenhum livro sendo lido no momento.</p>
