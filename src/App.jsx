@@ -34,6 +34,7 @@ function App() {
   const [selectedBook, setSelectedBook] = useState(null); 
   const [currentReadingIndex, setCurrentReadingIndex] = useState(0);
   const [shelfFilter, setShelfFilter] = useState("todos");
+  const [shelfYearFilter, setShelfYearFilter] = useState("todos");
 
   // =========================
   // RASTREAMENTO & METAS
@@ -659,6 +660,17 @@ function App() {
 
   const favorites = books.filter((b) => b.favorite);
   const byStatus = (s) => books.filter((b) => b.status === s);
+  const availableCompletionYears = [...new Set(
+    books
+      .filter((book) => book.status === 'lido' && (book.end_date || book.endDate))
+      .map((book) => {
+        const rawDate = book.end_date || book.endDate;
+        const parsed = new Date(rawDate + (rawDate.includes('T') ? '' : 'T12:00:00'));
+        const year = parsed.getFullYear();
+        return Number.isFinite(year) && !Number.isNaN(year) ? year : null;
+      })
+      .filter((year) => year !== null)
+  )].sort((a, b) => b - a);
 
   function getGenreData() {
     if (books.length === 0) return [];
@@ -1026,13 +1038,21 @@ function App() {
 
           <section className="books shelf-section">
   <div className="shelf-header"><h2>MEU ACERVO ✦</h2></div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px', gap: '10px', alignItems: 'center' }}>
-            <label style={{ color: 'var(--muted)', fontSize: '13px' }}>Filtrar:</label>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ color: 'var(--muted)', fontSize: '13px' }}>Status:</label>
             <select value={shelfFilter} onChange={(e) => setShelfFilter(e.target.value)} style={{ width: '160px' }}>
               <option value="todos">Todos</option>
               <option value="lido">Lido</option>
               <option value="lendo">Lendo</option>
               <option value="quero">Quero</option>
+            </select>
+
+            <label style={{ color: 'var(--muted)', fontSize: '13px' }}>Ano finalizado:</label>
+            <select value={shelfYearFilter} onChange={(e) => setShelfYearFilter(e.target.value)} style={{ width: '170px' }}>
+              <option value="todos">Todos os anos</option>
+              {availableCompletionYears.map((year) => (
+                <option key={year} value={String(year)}>{year}</option>
+              ))}
             </select>
           </div>
   <div 
@@ -1046,8 +1066,17 @@ function App() {
     }}
   >
             {(() => {
-              const filtered = shelfFilter === 'todos' ? books : books.filter(b => b.status === shelfFilter);
-              return filtered.length > 0 ? filtered.map(Card) : <p className="empty-text">Nenhum livro no acervo</p>;
+              const filtered = books.filter((book) => {
+                const statusMatch = shelfFilter === 'todos' ? true : book.status === shelfFilter;
+                const yearMatch = shelfYearFilter === 'todos' ? true : (() => {
+                  const rawDate = book.end_date || book.endDate;
+                  if (!rawDate || book.status !== 'lido') return false;
+                  const parsedYear = new Date(rawDate + (rawDate.includes('T') ? '' : 'T12:00:00')).getFullYear();
+                  return String(parsedYear) === String(shelfYearFilter);
+                })();
+                return statusMatch && yearMatch;
+              });
+              return filtered.length > 0 ? filtered.map(Card) : <p className="empty-text">Nenhum livro encontrado para esse filtro.</p>;
             })()}
   </div>
 </section>
