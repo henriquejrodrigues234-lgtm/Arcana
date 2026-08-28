@@ -791,32 +791,28 @@ function App() {
 
     try {
       if (digitalEditingId) {
-        const { data, error } = await supabase.from('digital_items').update(payload).eq('id', digitalEditingId).eq('user_id', user.id).select();
+        const { error } = await supabase.from('digital_items').update(payload).eq('id', digitalEditingId).eq('user_id', user.id);
         if (error) {
           console.error('Erro ao atualizar item digital:', error);
           return;
         }
-
-        if (data && data[0]) {
-          setDigitalItems((current) => current.map((item) => item.id === digitalEditingId ? { ...item, ...data[0] } : item));
-        }
       } else {
-        const { data, error } = await supabase.from('digital_items').insert([payload]).select();
+        const { error } = await supabase.from('digital_items').insert([payload]);
         if (error) {
           console.error('Erro ao salvar item digital:', error);
           return;
         }
-
-        if (data && data[0]) {
-          setDigitalItems((current) => current.filter((item) => item.id !== data[0].id).concat(data[0]));
-        }
       }
 
-      await fetchDigitalFromDb();
+      const { data } = await supabase.from('digital_items').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+      setDigitalItems(data || []);
     } catch (e) {
       console.error('Erro no fluxo de salvamento de digital_items:', e);
     } finally {
-      closeDigitalModal();
+      setDigitalEditingId(null);
+      setSelectedDigitalItem(null);
+      setDigitalModalOpen(false);
+      setDigitalForm({ title: "", author: "", format: "audio", source: "", cover: "", notes: "", consumed: false, consumed_at: null, start_date: "", end_date: "", rating: 0 });
     }
   }
 
