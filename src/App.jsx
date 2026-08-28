@@ -1284,15 +1284,17 @@ function App() {
         const pctRemainingBefore = 100 - pctReadBefore;
       const completedBooksFromAcervo = books.filter((book) => {
         if (book.status !== "lido") return false;
-        if (!book.endDate) return false;
-        const endDate = new Date(book.endDate + "T12:00:00");
-        return endDate.getMonth() === now.getMonth() && endDate.getFullYear() === now.getFullYear();
+        const rawDate = book.end_date || book.endDate;
+        if (!rawDate) return false;
+        const endDate = new Date(rawDate.includes('T') ? rawDate : rawDate + "T12:00:00");
+        return !Number.isNaN(endDate.getTime()) && endDate.getMonth() === now.getMonth() && endDate.getFullYear() === now.getFullYear();
       }).length;
       const completedBooksFromYear = books.filter((book) => {
         if (book.status !== "lido") return false;
-        if (!book.endDate) return false;
-        const endDate = new Date(book.endDate + "T12:00:00");
-        return endDate.getFullYear() === now.getFullYear();
+        const rawDate = book.end_date || book.endDate;
+        if (!rawDate) return false;
+        const endDate = new Date(rawDate.includes('T') ? rawDate : rawDate + "T12:00:00");
+        return !Number.isNaN(endDate.getTime()) && endDate.getFullYear() === now.getFullYear();
       }).length;
       const booksCompletedThisMonth = completedBooksFromAcervo + beforeThirtyBooks.filter((book) => {
         if (!book.read) return false;
