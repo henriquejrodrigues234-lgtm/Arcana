@@ -1225,19 +1225,33 @@ function App() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div className="card" style={{ padding: '20px' }}>
                 <h4 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold-soft)', marginBottom: '15px' }}>LEITURA ATUAL</h4>
-                {livroAtual ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <button onClick={(e) => { e.stopPropagation(); prevReading(); }} style={{ background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '18px', cursor: 'pointer' }}>◀</button>
-                    <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }} onClick={() => handleCardClick(livroAtual)}>
-                      <img src={livroAtual.cover || "https://via.placeholder.com/70x105"} alt="Capa" style={{ width: '70px', borderRadius: '6px', border: '1px solid rgba(214,180,125,0.2)' }} />
-                      <div style={{ flex: 1 }}>
-                        <h4 style={{ margin: '0 0 5px 0', fontSize: '15px' }}>{livroAtual.title}</h4>
-                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)' }}>{livroAtual.author}</p>
-                        <div className="progress-container" style={{ margin: '10px 0 5px 0', height: '6px' }}><div className="progress-bar" style={{ width: `${calculatePercentage(livroAtual.current_page, livroAtual.pages)}%` }}></div></div>
-                        <span style={{ fontSize: '11px', color: 'var(--gold-soft)' }}>{calculatePercentage(livroAtual.current_page, livroAtual.pages)}% concluído</span>
-                      </div>
+                {byStatus("lendo").length > 0 ? (
+                  <div style={{ display: 'flex', alignItems: 'stretch', gap: '12px' }}>
+                    {byStatus("lendo").length > 2 && (
+                      <button onClick={(e) => { e.stopPropagation(); prevReading(); }} style={{ background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '18px', cursor: 'pointer', alignSelf: 'center' }}>◀</button>
+                    )}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', flex: 1, minWidth: 0 }}>
+                      {Array.from({ length: Math.min(2, byStatus("lendo").length) }, (_, offset) => byStatus("lendo")[(currentReadingIndex + offset) % byStatus("lendo").length]).map((book) => {
+                        const pct = calculatePercentage(book.current_page, book.pages);
+
+                        return (
+                          <div key={book.id} style={{ display: 'flex', gap: '15px', alignItems: 'center', minWidth: 0 }} onClick={() => handleCardClick(book)}>
+                            <img src={book.cover || "https://via.placeholder.com/70x105"} alt="Capa" style={{ width: '70px', height: '105px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(214,180,125,0.2)' }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <h4 style={{ margin: '0 0 5px 0', fontSize: '15px', color: 'var(--gold-soft)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{book.title}</h4>
+                              <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)' }}>{book.author}</p>
+                              <div className="progress-container" style={{ margin: '10px 0 5px 0', height: '6px' }}><div className="progress-bar" style={{ width: `${pct}%` }}></div></div>
+                              <span style={{ fontSize: '11px', color: 'var(--gold-soft)' }}>{pct}% concluído</span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); nextReading(); }} style={{ background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '18px', cursor: 'pointer' }}>▶</button>
+
+                    {byStatus("lendo").length > 2 && (
+                      <button onClick={(e) => { e.stopPropagation(); nextReading(); }} style={{ background: 'none', border: 'none', color: 'var(--gold-soft)', fontSize: '18px', cursor: 'pointer', alignSelf: 'center' }}>▶</button>
+                    )}
                   </div>
                 ) : <p style={{ color: 'var(--muted)', fontSize: '13px', margin: 0 }}>Nenhum grimório sendo lido ativamente.</p>}
               </div>
