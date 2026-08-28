@@ -673,14 +673,22 @@ function App() {
 
   function getYearlyReadCounts() {
     const counts = {};
+
     books.forEach((book) => {
-      const d = book.end_date || book.endDate || book.endDate;
-      if (!d) return;
-      const yr = new Date(d).getFullYear();
-      if (!yr || Number.isNaN(yr)) return;
-      counts[yr] = (counts[yr] || 0) + 1;
+      const isRead = book.status === 'lido';
+      const rawDate = book.end_date || book.endDate;
+      if (!isRead || !rawDate) return;
+
+      const date = new Date(rawDate);
+      const year = date.getFullYear();
+      if (!Number.isFinite(year) || Number.isNaN(year)) return;
+
+      counts[year] = (counts[year] || 0) + 1;
     });
-    return Object.keys(counts).map(y => ({ year: parseInt(y, 10), count: counts[y] })).sort((a, b) => b.year - a.year);
+
+    return Object.keys(counts)
+      .map((year) => ({ year: parseInt(year, 10), count: counts[year] }))
+      .sort((a, b) => b.year - a.year);
   }
 
   // fetch before_thirty entries from Supabase
