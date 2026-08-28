@@ -1022,16 +1022,36 @@ function App() {
 
             <div className="favorites-section">
               <h3>FAVORITOS 💖</h3>
-              <div className="favorites-grid">
-                {favorites.slice(0, 4).map((book) => (
-                  <div key={book.id} className="fav-mini-card" onClick={() => handleCardClick(book)} style={{ cursor: 'pointer' }}>
-                    <img src={book.cover || "https://via.placeholder.com/120x180"} alt={book.title} />
-                    <h5>{book.title}</h5>
-                    <div className="stars-mini">
-                      {Array.from({ length: book.rating }).map((_, i) => <span key={i}>★</span>)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const container = document.getElementById('favorites-scroll');
+                    if (container) container.scrollBy({ left: -220, behavior: 'smooth' });
+                  }}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(214,180,125,0.2)', color: 'var(--gold-soft)', width: '32px', height: '32px', padding: 0, borderRadius: '50%', fontSize: '18px', flexShrink: 0 }}
+                >◀</button>
+
+                <div id="favorites-scroll" style={{ display: 'flex', gap: '14px', overflowX: 'auto', scrollBehavior: 'smooth', paddingBottom: '6px', flex: 1 }}>
+                  {favorites.map((book) => (
+                    <div key={book.id} className="fav-mini-card" onClick={() => handleCardClick(book)} style={{ cursor: 'pointer', minWidth: '110px', flex: '0 0 110px' }}>
+                      <img src={book.cover || "https://via.placeholder.com/120x180"} alt={book.title} />
+                      <h5>{book.title}</h5>
+                      <div className="stars-mini">
+                        {Array.from({ length: book.rating }).map((_, i) => <span key={i}>★</span>)}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const container = document.getElementById('favorites-scroll');
+                    if (container) container.scrollBy({ left: 220, behavior: 'smooth' });
+                  }}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(214,180,125,0.2)', color: 'var(--gold-soft)', width: '32px', height: '32px', padding: 0, borderRadius: '50%', fontSize: '18px', flexShrink: 0 }}
+                >▶</button>
               </div>
             </div>
           </section>
