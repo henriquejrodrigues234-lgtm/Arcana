@@ -26,7 +26,10 @@ function App() {
   // =========================
   const [page, setPage] = useState("leituras");
   const [digitalItems, setDigitalItems] = useState([]);
-  const [digitalForm, setDigitalForm] = useState({ title: "", author: "", format: "audio", source: "", cover: "", notes: "", consumed: false, consumed_at: null });
+  const [digitalForm, setDigitalForm] = useState({ title: "", author: "", format: "audio", source: "", cover: "", notes: "", consumed: false, consumed_at: null, start_date: "", end_date: "", rating: 0 });
+  const [digitalModalOpen, setDigitalModalOpen] = useState(false);
+  const [digitalEditingId, setDigitalEditingId] = useState(null);
+  const [selectedDigitalItem, setSelectedDigitalItem] = useState(null);
   const [books, setBooks] = useState([]);
   const [booksLoading, setBooksLoading] = useState(false);
   const [openModal, setOpenModal] = useState(false);
@@ -144,7 +147,10 @@ function App() {
       setBeforeThirtyBooks([]);
       setBeforeThirtyForm({ title: "", author: "", cover: "", read: false });
       setDigitalItems([]);
-      setDigitalForm({ title: "", author: "", format: "audio", source: "", cover: "", notes: "", consumed: false });
+      setDigitalForm({ title: "", author: "", format: "audio", source: "", cover: "", notes: "", consumed: false, consumed_at: null, start_date: "", end_date: "", rating: 0 });
+      setDigitalModalOpen(false);
+      setDigitalEditingId(null);
+      setSelectedDigitalItem(null);
     }
   }, [user]);
 
@@ -725,10 +731,43 @@ function App() {
     }
   }
 
-  async function addDigitalItem(e) {
+  function openDigitalModal(item = null) {
+    if (item) {
+      setDigitalEditingId(item.id || null);
+      setSelectedDigitalItem(item);
+      setDigitalForm({
+        title: item.title || "",
+        author: item.author || "",
+        format: item.format || "audio",
+        source: item.source || "",
+        cover: item.cover || "",
+        notes: item.notes || "",
+        consumed: !!item.consumed,
+        consumed_at: item.consumed_at || null,
+        start_date: item.start_date || item.startDate || "",
+        end_date: item.end_date || item.endDate || "",
+        rating: Number(item.rating) || 0,
+      });
+    } else {
+      setDigitalEditingId(null);
+      setSelectedDigitalItem(null);
+      setDigitalForm({ title: "", author: "", format: "audio", source: "", cover: "", notes: "", consumed: false, consumed_at: null, start_date: "", end_date: "", rating: 0 });
+    }
+    setDigitalModalOpen(true);
+  }
+
+  function closeDigitalModal() {
+    setDigitalModalOpen(false);
+    setDigitalEditingId(null);
+    setSelectedDigitalItem(null);
+    setDigitalForm({ title: "", author: "", format: "audio", source: "", cover: "", notes: "", consumed: false, consumed_at: null, start_date: "", end_date: "", rating: 0 });
+  }
+
+  async function saveDigitalItem(e) {
     if (e && e.preventDefault) e.preventDefault();
     const title = (digitalForm.title || '').trim();
     if (!title || !user) return;
+
     const payload = {
       user_id: user.id,
       title,
@@ -738,38 +777,51 @@ function App() {
       cover: digitalForm.cover || null,
       notes: digitalForm.notes || '',
       consumed: !!digitalForm.consumed,
-      consumed_at: digitalForm.consumed ? (digitalForm.consumed_at || new Date().toISOString().split('T')[0]) : null
+      consumed_at: digitalForm.consumed ? (digitalForm.consumed_at || new Date().toISOString().split('T')[0]) : null,
+      start_date: digitalForm.start_date || null,
+      end_date: digitalForm.end_date || null,
+      rating: Number(digitalForm.rating) || 0,
     };
 
-    const { data, error } = await supabase.from('digital_items').insert([payload]).select();
-    if (!error && data && data[0]) {
-      setDigitalItems([data[0], ...digitalItems]);
+    if (digitalEditingId) {
+      const { data, error } = await supabase.from('digital_items').update(payload).eq('id', digitalEditingId).eq('user_id', user.id).select();
+      if (!error && data && data[0]) {
+        setDigitalItems((current) => current.map((item) => item.id === digitalEditingId ? { ...item, ...data[0] } : item));
+      }
+    } else {
+      const { data, error } = await supabase.from('digital_items').insert([payload]).select();
+      if (!error && data && data[0]) {
+        setDigitalItems((current) => [data[0], ...current]);
+      }
     }
-    setDigitalForm({ title: "", author: "", format: "audio", source: "", cover: "", notes: "", consumed: false, consumed_at: null });
+
+    closeDigitalModal();
   }
 
-  async function removeDigitalItem(index) {
-    const item = digitalItems[index];
-    if (!item || !item.id) return;
+  async function removeDigitalItem(item) {
+    const target = item && item.id ? item : digitalItems.find((digitalItem) => digitalItem.id === digitalEditingId);
+    if (!target || !target.id) return;
 
-    const { error } = await supabase.from('digital_items').delete().eq('id', item.id).eq('user_id', user.id);
+    const { error } = await supabase.from('digital_items').delete().eq('id', target.id).eq('user_id', user.id);
     if (!error) {
-      const updated = digitalItems.filter((_, i) => i !== index);
-      setDigitalItems(updated);
+      setDigitalItems((current) => current.filter((digitalItem) => digitalItem.id !== target.id));
+    }
+    if (selectedDigitalItem && selectedDigitalItem.id === target.id) {
+      setSelectedDigitalItem(null);
+    }
+    if (digitalEditingId === target.id) {
+      closeDigitalModal();
     }
   }
 
-  async function toggleDigitalConsumed(index) {
-    const item = digitalItems[index];
+  async function toggleDigitalConsumed(item) {
     if (!item || !item.id) return;
     const next = !item.consumed;
     const consumed_at = next ? new Date().toISOString().split('T')[0] : null;
 
     const { error } = await supabase.from('digital_items').update({ consumed: next, consumed_at }).eq('id', item.id).eq('user_id', user.id);
     if (!error) {
-      const updated = [...digitalItems];
-      updated[index] = { ...updated[index], consumed: next, consumed_at };
-      setDigitalItems(updated);
+      setDigitalItems((current) => current.map((digitalItem) => digitalItem.id === item.id ? { ...digitalItem, consumed: next, consumed_at } : digitalItem));
     }
   }
 
@@ -1446,72 +1498,105 @@ function App() {
               <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)', margin: 0 }}>🎧 Áudios & Livros Digitais</h2>
               <p style={{ color: 'var(--muted)', margin: 0 }}>Adicione e gerencie suas mídias em áudio e edições digitais.</p>
             </div>
-            <button onClick={() => setDigitalForm({ title: "", author: "", format: "audio", source: "", cover: "", notes: "", consumed: false })} className="btn-add-magic">+ Novo</button>
+            <button onClick={() => openDigitalModal()} className="btn-add-magic">+ Novo</button>
           </div>
 
-          <div className="card" style={{ padding: '16px', marginBottom: '16px' }}>
-            <form onSubmit={addDigitalItem} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px', gap: '10px', alignItems: 'end' }}>
-              <div>
-                <label style={{ fontSize: '12px', color: 'var(--muted)' }}>Título</label>
-                <input value={digitalForm.title} onChange={(e) => setDigitalForm({ ...digitalForm, title: e.target.value })} placeholder="Título" />
-              </div>
-              <div>
-                <label style={{ fontSize: '12px', color: 'var(--muted)' }}>Autor</label>
-                <input value={digitalForm.author} onChange={(e) => setDigitalForm({ ...digitalForm, author: e.target.value })} placeholder="Autor" />
-              </div>
-              <div>
-                <label style={{ fontSize: '12px', color: 'var(--muted)' }}>Formato</label>
-                <select value={digitalForm.format} onChange={(e) => setDigitalForm({ ...digitalForm, format: e.target.value })}>
-                  <option value="audio">Audiobook</option>
-                  <option value="ebook">E-book</option>
-                </select>
-              </div>
-
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ fontSize: '12px', color: 'var(--muted)' }}>Fonte / Link</label>
-                <input value={digitalForm.source} onChange={(e) => setDigitalForm({ ...digitalForm, source: e.target.value })} placeholder="URL, serviço, caminho" />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', color: 'var(--muted)' }}>Capa (URL)</label>
-                <input value={digitalForm.cover} onChange={(e) => setDigitalForm({ ...digitalForm, cover: e.target.value })} placeholder="https://..." />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', color: 'var(--muted)' }}>Status</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button type="button" onClick={() => setDigitalForm({ ...digitalForm, consumed: !digitalForm.consumed })} style={{ padding: '8px 10px' }}>{digitalForm.consumed ? '✓ Consumido' : '○ Não consumido'}</button>
-                  <button type="submit" className="btn-add-magic">Salvar</button>
+          <div className="digital-gallery">
+            {digitalItems.length > 0 ? digitalItems.map((it) => (
+              <div key={it.id} className="digital-mini-card" onClick={() => {
+                setSelectedDigitalItem(it);
+                openDigitalModal(it);
+              }}>
+                <img src={it.cover || "https://via.placeholder.com/160x220"} alt={it.title} />
+                <div className="digital-mini-info">
+                  <strong>{it.title}</strong>
+                  <span>{it.author}</span>
+                  <small>{it.format === 'audio' ? 'Audiobook' : 'E-book'}</small>
                 </div>
               </div>
-            </form>
-          </div>
-
-          <div className="card">
-            <h3 style={{ marginTop: 0, marginBottom: '12px' }}>Sua Biblioteca Digital</h3>
-            {digitalItems.length > 0 ? (
-              <div style={{ display: 'grid', gap: '10px' }}>
-                {digitalItems.map((it, idx) => (
-                  <div key={it.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderRadius: '10px', background: 'rgba(255,255,255,0.02)' }}>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                      {it.cover ? <img src={it.cover} alt={it.title} style={{ width: '48px', height: '68px', objectFit: 'cover', borderRadius: '6px' }} /> : <div style={{ width: '48px', height: '68px', borderRadius: '6px', background: 'rgba(214,180,125,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🎧</div>}
-                      <div>
-                        <div style={{ fontWeight: '600', color: 'var(--gold-soft)' }}>{it.title}</div>
-                        <div style={{ fontSize: '13px', color: 'var(--muted)' }}>{it.author} • {it.format}</div>
-                        {it.source && <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{it.source}</div>}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <button onClick={() => toggleDigitalConsumed(idx)} style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)', background: it.consumed ? 'rgba(98,255,176,0.08)' : 'transparent' }}>{it.consumed ? '✓ Consumido' : '○ Marcar'}</button>
-                      <button onClick={() => removeDigitalItem(idx)} style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer' }}>✕</button>
-                    </div>
-                  </div>
-                ))}
+            )) : (
+              <div className="card" style={{ gridColumn: '1 / -1', padding: '20px', color: 'var(--muted)' }}>
+                Nenhuma mídia digital adicionada ainda.
               </div>
-            ) : (
-              <p style={{ color: 'var(--muted)' }}>Nenhuma mídia digital adicionada ainda.</p>
             )}
           </div>
+
+          {digitalModalOpen && (
+            <div className="modal-overlay" onClick={closeDigitalModal}>
+              <div className="cozy-modal" onClick={(e) => e.stopPropagation()}>
+                <button type="button" className="close-preview-x" onClick={closeDigitalModal}>✕</button>
+                <h2>{digitalEditingId ? 'Editar mídia' : 'Adicionar mídia'}</h2>
+
+                <form onSubmit={saveDigitalItem} style={{ display: 'grid', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Título</label>
+                      <input value={digitalForm.title} onChange={(e) => setDigitalForm({ ...digitalForm, title: e.target.value })} placeholder="Ex: Duna" required />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Autor</label>
+                      <input value={digitalForm.author} onChange={(e) => setDigitalForm({ ...digitalForm, author: e.target.value })} placeholder="Ex: Frank Herbert" required />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Tipo de mídia</label>
+                      <select value={digitalForm.format} onChange={(e) => setDigitalForm({ ...digitalForm, format: e.target.value })}>
+                        <option value="audio">Audiobook</option>
+                        <option value="ebook">E-book</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Status</label>
+                      <button type="button" onClick={() => setDigitalForm({ ...digitalForm, consumed: !digitalForm.consumed })} style={{ width: '100%', background: digitalForm.consumed ? 'rgba(98,255,176,0.12)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(214,180,125,0.2)', color: digitalForm.consumed ? '#62ffb0' : 'var(--gold-soft)', padding: '12px' }}>
+                        {digitalForm.consumed ? '✓ Consumido' : '○ Não consumido'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Data de início</label>
+                      <input type="date" value={digitalForm.start_date || ""} onChange={(e) => setDigitalForm({ ...digitalForm, start_date: e.target.value })} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Data de conclusão</label>
+                      <input type="date" value={digitalForm.end_date || ""} onChange={(e) => setDigitalForm({ ...digitalForm, end_date: e.target.value })} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>URL ou upload da capa</label>
+                    <input value={digitalForm.cover} onChange={(e) => setDigitalForm({ ...digitalForm, cover: e.target.value })} placeholder="https://..." />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Fonte / Link</label>
+                    <input value={digitalForm.source} onChange={(e) => setDigitalForm({ ...digitalForm, source: e.target.value })} placeholder="Spotify, Kindle, YouTube, drive..." />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Nota</label>
+                    <Stars value={digitalForm.rating} onChange={(n) => setDigitalForm({ ...digitalForm, rating: n })} />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Notas / observações</label>
+                    <textarea value={digitalForm.notes} onChange={(e) => setDigitalForm({ ...digitalForm, notes: e.target.value })} placeholder="Resumo, observações ou motivo da escolha" />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '6px' }}>
+                    {digitalEditingId && (
+                      <button type="button" onClick={() => removeDigitalItem(selectedDigitalItem || { id: digitalEditingId })} style={{ background: '#8b0000', color: '#fff' }}>Excluir</button>
+                    )}
+                    <button type="button" onClick={closeDigitalModal} style={{ background: 'transparent', border: '1px solid rgba(214,180,125,0.3)', color: 'var(--gold-soft)' }}>Cancelar</button>
+                    <button type="submit" className="btn-add-magic">{digitalEditingId ? 'Salvar alterações' : 'Adicionar'}</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       );
     }

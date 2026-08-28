@@ -563,6 +563,55 @@ textarea {
   font-style: italic;
 }
 
+.digital-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 18px;
+}
+
+.digital-mini-card {
+  background: rgba(36, 23, 50, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: 0.2s ease-in-out;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+.digital-mini-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(214, 180, 125, 0.3);
+}
+
+.digital-mini-card img {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  display: block;
+}
+
+.digital-mini-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 10px 14px;
+}
+
+.digital-mini-info strong {
+  color: var(--gold-soft);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.digital-mini-info span,
+.digital-mini-info small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .favorites-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
