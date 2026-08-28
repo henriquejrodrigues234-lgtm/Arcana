@@ -766,9 +766,7 @@ function App() {
   async function saveDigitalItem(e) {
     if (e && e.preventDefault) e.preventDefault();
     const title = (digitalForm.title || '').trim();
-    if (!title) {
-      return;
-    }
+    if (!title) return;
 
     if (!user) {
       alert('Você precisa estar logado para salvar itens digitais.');
@@ -792,32 +790,29 @@ function App() {
     };
 
     try {
-      let savedItem = null;
-
       if (digitalEditingId) {
         const { data, error } = await supabase.from('digital_items').update(payload).eq('id', digitalEditingId).eq('user_id', user.id).select();
         if (error) {
           console.error('Erro ao atualizar item digital:', error);
-          setDigitalItems((current) => [{ ...payload, id: digitalEditingId, created_at: new Date().toISOString() }, ...current.filter((item) => item.id !== digitalEditingId)]);
-        } else if (data && data[0]) {
-          savedItem = data[0];
-          setDigitalItems((current) => current.map((item) => item.id === digitalEditingId ? { ...item, ...savedItem } : item));
+          return;
+        }
+
+        if (data && data[0]) {
+          setDigitalItems((current) => current.map((item) => item.id === digitalEditingId ? { ...item, ...data[0] } : item));
         }
       } else {
         const { data, error } = await supabase.from('digital_items').insert([payload]).select();
         if (error) {
           console.error('Erro ao salvar item digital:', error);
-          const fallbackItem = { ...payload, id: `local-${Date.now()}`, created_at: new Date().toISOString() };
-          setDigitalItems((current) => [fallbackItem, ...current]);
-        } else if (data && data[0]) {
-          savedItem = data[0];
-          setDigitalItems((current) => [data[0], ...current]);
+          return;
+        }
+
+        if (data && data[0]) {
+          setDigitalItems((current) => current.filter((item) => item.id !== data[0].id).concat(data[0]));
         }
       }
 
-      if (user) {
-        await fetchDigitalFromDb();
-      }
+      await fetchDigitalFromDb();
     } catch (e) {
       console.error('Erro no fluxo de salvamento de digital_items:', e);
     } finally {
@@ -832,13 +827,14 @@ function App() {
     const { error } = await supabase.from('digital_items').delete().eq('id', target.id).eq('user_id', user.id);
     if (!error) {
       setDigitalItems((current) => current.filter((digitalItem) => digitalItem.id !== target.id));
+      if (user) {
+        await fetchDigitalFromDb();
+      }
     }
-    if (selectedDigitalItem && selectedDigitalItem.id === target.id) {
-      setSelectedDigitalItem(null);
-    }
-    if (digitalEditingId === target.id) {
-      closeDigitalModal();
-    }
+
+    setSelectedDigitalItem(null);
+    setDigitalEditingId(null);
+    closeDigitalModal();
   }
 
   async function toggleDigitalConsumed(item) {
