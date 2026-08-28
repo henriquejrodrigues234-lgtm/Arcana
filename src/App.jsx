@@ -766,7 +766,15 @@ function App() {
   async function saveDigitalItem(e) {
     if (e && e.preventDefault) e.preventDefault();
     const title = (digitalForm.title || '').trim();
-    if (!title || !user) return;
+    if (!title) {
+      return;
+    }
+
+    if (!user) {
+      alert('Você precisa estar logado para salvar itens digitais.');
+      closeDigitalModal();
+      return;
+    }
 
     const payload = {
       user_id: user.id,
@@ -784,34 +792,37 @@ function App() {
     };
 
     try {
+      let savedItem = null;
+
       if (digitalEditingId) {
         const { data, error } = await supabase.from('digital_items').update(payload).eq('id', digitalEditingId).eq('user_id', user.id).select();
         if (error) {
           console.error('Erro ao atualizar item digital:', error);
-          return;
-        }
-        if (data && data[0]) {
-          setDigitalItems((current) => current.map((item) => item.id === digitalEditingId ? { ...item, ...data[0] } : item));
+          setDigitalItems((current) => [{ ...payload, id: digitalEditingId, created_at: new Date().toISOString() }, ...current.filter((item) => item.id !== digitalEditingId)]);
+        } else if (data && data[0]) {
+          savedItem = data[0];
+          setDigitalItems((current) => current.map((item) => item.id === digitalEditingId ? { ...item, ...savedItem } : item));
         }
       } else {
         const { data, error } = await supabase.from('digital_items').insert([payload]).select();
         if (error) {
           console.error('Erro ao salvar item digital:', error);
-          return;
-        }
-
-        if (data && data[0]) {
+          const fallbackItem = { ...payload, id: `local-${Date.now()}`, created_at: new Date().toISOString() };
+          setDigitalItems((current) => [fallbackItem, ...current]);
+        } else if (data && data[0]) {
+          savedItem = data[0];
           setDigitalItems((current) => [data[0], ...current]);
         }
       }
 
-      await fetchDigitalFromDb();
+      if (user) {
+        await fetchDigitalFromDb();
+      }
     } catch (e) {
       console.error('Erro no fluxo de salvamento de digital_items:', e);
-      return;
+    } finally {
+      closeDigitalModal();
     }
-
-    closeDigitalModal();
   }
 
   async function removeDigitalItem(item) {
