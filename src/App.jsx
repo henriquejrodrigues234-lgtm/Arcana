@@ -120,33 +120,21 @@ function App() {
       fetchBooks();
       fetchLogs();
       fetchWishlist();
+      fetchBeforeThirtyFromDb();
+      fetchGenresFromDb();
+      fetchDigitalFromDb();
+
       const savedGoals = localStorage.getItem(`arcana-goals-${user.id}`);
-      const savedBeforeThirty = localStorage.getItem(`arcana-before-thirty-${user.id}`);
-      if (savedGoals) setGoals(JSON.parse(savedGoals));
-      if (savedBeforeThirty) {
-        const parsed = JSON.parse(savedBeforeThirty);
-        const normalized = Array.isArray(parsed)
-          ? parsed.map((item) => typeof item === 'string' ? { title: item, author: '', cover: '', read: false } : item)
-          : [];
-        setBeforeThirtyBooks(normalized);
-        // try to sync remote before-thirty list
-        fetchBeforeThirtyFromDb();
+      if (savedGoals) {
+        try { setGoals(JSON.parse(savedGoals)); } catch (e) { setGoals({ pagesPerDay: 30, booksPerMonth: 2, booksPerYear: 24 }); }
       }
-      // load genres from localStorage first (fast), then try to fetch remote list
+
       const savedGenres = localStorage.getItem(`arcana-genres-${user.id}`);
       if (savedGenres) {
         try { setGenres(JSON.parse(savedGenres)); } catch (e) { setGenres([]); }
       } else {
         setGenres(["Fantasia", "Ficção Científica", "Romance", "Mistério", "Não-ficção", "Terror", "Biografia", "Outros"]);
       }
-      // try to sync from Supabase (overrides local if available)
-      fetchGenresFromDb();
-      // load digital items (local first)
-      try {
-        const savedDigital = localStorage.getItem(`arcana-digital-${user.id}`);
-        if (savedDigital) setDigitalItems(JSON.parse(savedDigital));
-      } catch (e) {}
-      fetchDigitalFromDb();
     } else {
       setBooks([]);
       setReadingLogs([]);
@@ -172,13 +160,13 @@ function App() {
 
   useEffect(() => {
     if (!user) return;
-    try { localStorage.setItem(`arcana-digital-${user.id}`, JSON.stringify(digitalItems)); } catch (e) {}
-  }, [user, digitalItems]);
+    try { localStorage.setItem(`arcana-goals-${user.id}`, JSON.stringify(goals)); } catch (e) {}
+  }, [user, goals]);
 
   useEffect(() => {
     if (!user) return;
-    localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify(beforeThirtyBooks));
-  }, [user, beforeThirtyBooks]);
+    localStorage.setItem(`arcana-genres-${user.id}`, JSON.stringify(genres));
+  }, [user, genres]);
 
   // =========================
   // METODOS DE AUTENTICAÇÃO
@@ -478,7 +466,7 @@ function App() {
     };
 
     if (editingWishlistId) {
-      const { error } = await supabase.from("wishlist").update(dataPayload).eq("id", editingWishlistId);
+      const { error } = await supabase.from("wishlist").update(dataPayload).eq("id", editingWishlistId).eq("user_id", user.id);
       if (!error) {
         setWishlistItems(wishlistItems.map(item => item.id === editingWishlistId ? { ...item, ...dataPayload } : item));
       }
@@ -493,7 +481,7 @@ function App() {
 
   async function deleteWishlistItem(id) {
     if (!window.confirm("Deseja remover este item da sua Wishlist?")) return;
-    const { error } = await supabase.from("wishlist").delete().eq("id", id);
+    const { error } = await supabase.from("wishlist").delete().eq("id", id).eq("user_id", user.id);
     if (!error) setWishlistItems(wishlistItems.filter(item => item.id !== id));
   }
 
@@ -501,7 +489,7 @@ function App() {
     const nextStatus = item.status === "quero" ? "comprado" : "quero";
     const dateBought = nextStatus === "comprado" ? new Date().toISOString().split('T')[0] : null;
 
-    const { error } = await supabase.from("wishlist").update({ status: nextStatus, bought_at: dateBought }).eq("id", item.id);
+    const { error } = await supabase.from("wishlist").update({ status: nextStatus, bought_at: dateBought }).eq("id", item.id).eq("user_id", user.id);
     if (!error) {
       setWishlistItems(wishlistItems.map(i => i.id === item.id ? { ...i, status: nextStatus, bought_at: dateBought } : i));
     }
@@ -612,12 +600,6 @@ function App() {
     const { data, error } = await supabase.from('before_thirty').insert([payload]).select();
     if (!error && data && data[0]) {
       setBeforeThirtyBooks([data[0], ...beforeThirtyBooks]);
-      try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify([data[0], ...beforeThirtyBooks])); } catch (e) {}
-    } else {
-      // fallback local-only
-      const localItem = { ...payload, id: `local-${Date.now()}` };
-      setBeforeThirtyBooks([localItem, ...beforeThirtyBooks]);
-      try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify([localItem, ...beforeThirtyBooks])); } catch (e) {}
     }
     setBeforeThirtyForm({ title: "", author: "", cover: "", read: false, read_at: null });
     setOpenBeforeThirtyModal(false);
@@ -625,20 +607,12 @@ function App() {
 
   async function removeBeforeThirtyBook(index) {
     const item = beforeThirtyBooks[index];
-    if (!item) return;
-    if (item.id && String(item.id).startsWith('local-')) {
+    if (!item || !item.id) return;
+
+    const { error } = await supabase.from('before_thirty').delete().eq('id', item.id).eq('user_id', user.id);
+    if (!error) {
       const updated = beforeThirtyBooks.filter((_, i) => i !== index);
       setBeforeThirtyBooks(updated);
-      try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify(updated)); } catch (e) {}
-      return;
-    }
-    if (item.id) {
-      const { error } = await supabase.from('before_thirty').delete().eq('id', item.id);
-      if (!error) {
-        const updated = beforeThirtyBooks.filter((_, i) => i !== index);
-        setBeforeThirtyBooks(updated);
-        try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify(updated)); } catch (e) {}
-      }
     }
   }
 
@@ -713,29 +687,9 @@ function App() {
   async function fetchBeforeThirtyFromDb() {
     if (!user) return;
     const { data, error } = await supabase.from('before_thirty').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-    if (!error && data && data.length > 0) {
-      setBeforeThirtyBooks(data);
-      try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify(data)); } catch (e) {}
-      return;
+    if (!error) {
+      setBeforeThirtyBooks(data || []);
     }
-    // if remote empty but local saved entries exist, try to push them
-    try {
-      const savedLocal = localStorage.getItem(`arcana-before-thirty-${user.id}`);
-      if (savedLocal) {
-        const parsed = JSON.parse(savedLocal);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          for (const item of parsed) {
-            const payload = { user_id: user.id, title: item.title || '', author: item.author || '', cover: item.cover || null, read: !!item.read, read_at: item.read_at || null };
-            await supabase.from('before_thirty').insert([payload]);
-          }
-          const { data: newData } = await supabase.from('before_thirty').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-          if (newData) {
-            setBeforeThirtyBooks(newData);
-            try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify(newData)); } catch (e) {}
-          }
-        }
-      }
-    } catch (e) {}
   }
 
   // digital/audio items helpers
@@ -743,21 +697,20 @@ function App() {
     if (!user) return;
     try {
       const { data, error } = await supabase.from('digital_items').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
-        setDigitalItems(data);
-        try { localStorage.setItem(`arcana-digital-${user.id}`, JSON.stringify(data)); } catch (e) {}
+      if (!error) {
+        setDigitalItems(data || []);
       }
     } catch (e) {
-      // ignore
+      console.error('Erro ao buscar digital_items do usuário', e);
     }
   }
 
   async function addDigitalItem(e) {
     if (e && e.preventDefault) e.preventDefault();
     const title = (digitalForm.title || '').trim();
-    if (!title) return;
+    if (!title || !user) return;
     const payload = {
-      user_id: user ? user.id : null,
+      user_id: user.id,
       title,
       author: digitalForm.author || '',
       format: digitalForm.format || 'audio',
@@ -768,80 +721,49 @@ function App() {
       consumed_at: digitalForm.consumed ? (digitalForm.consumed_at || new Date().toISOString().split('T')[0]) : null
     };
 
-    if (user) {
-      const { data, error } = await supabase.from('digital_items').insert([payload]).select();
-      if (!error && data && data[0]) {
-        setDigitalItems([data[0], ...digitalItems]);
-        try { localStorage.setItem(`arcana-digital-${user.id}`, JSON.stringify([data[0], ...digitalItems])); } catch (e) {}
-      } else {
-        const localItem = { ...payload, id: `local-${Date.now()}` };
-        setDigitalItems([localItem, ...digitalItems]);
-      }
-    } else {
-      const localItem = { ...payload, id: `local-${Date.now()}` };
-      setDigitalItems([localItem, ...digitalItems]);
+    const { data, error } = await supabase.from('digital_items').insert([payload]).select();
+    if (!error && data && data[0]) {
+      setDigitalItems([data[0], ...digitalItems]);
     }
     setDigitalForm({ title: "", author: "", format: "audio", source: "", cover: "", notes: "", consumed: false, consumed_at: null });
   }
 
   async function removeDigitalItem(index) {
     const item = digitalItems[index];
-    if (!item) return;
-    if (item.id && String(item.id).startsWith('local-')) {
+    if (!item || !item.id) return;
+
+    const { error } = await supabase.from('digital_items').delete().eq('id', item.id).eq('user_id', user.id);
+    if (!error) {
       const updated = digitalItems.filter((_, i) => i !== index);
       setDigitalItems(updated);
-      try { localStorage.setItem(`arcana-digital-${user.id}`, JSON.stringify(updated)); } catch (e) {}
-      return;
-    }
-    if (item.id) {
-      const { error } = await supabase.from('digital_items').delete().eq('id', item.id);
-      if (!error) {
-        const updated = digitalItems.filter((_, i) => i !== index);
-        setDigitalItems(updated);
-        try { localStorage.setItem(`arcana-digital-${user.id}`, JSON.stringify(updated)); } catch (e) {}
-      }
     }
   }
 
   async function toggleDigitalConsumed(index) {
     const item = digitalItems[index];
-    if (!item) return;
+    if (!item || !item.id) return;
     const next = !item.consumed;
     const consumed_at = next ? new Date().toISOString().split('T')[0] : null;
-    if (item.id && !String(item.id).startsWith('local-')) {
-      const { error } = await supabase.from('digital_items').update({ consumed: next, consumed_at }).eq('id', item.id);
-      if (!error) {
-        const updated = [...digitalItems];
-        updated[index] = { ...updated[index], consumed: next, consumed_at };
-        setDigitalItems(updated);
-        try { localStorage.setItem(`arcana-digital-${user.id}`, JSON.stringify(updated)); } catch (e) {}
-      }
-    } else {
+
+    const { error } = await supabase.from('digital_items').update({ consumed: next, consumed_at }).eq('id', item.id).eq('user_id', user.id);
+    if (!error) {
       const updated = [...digitalItems];
       updated[index] = { ...updated[index], consumed: next, consumed_at };
       setDigitalItems(updated);
-      try { localStorage.setItem(`arcana-digital-${user.id}`, JSON.stringify(updated)); } catch (e) {}
     }
   }
 
   async function toggleBeforeThirtyRead(index) {
     const item = beforeThirtyBooks[index];
-    if (!item) return;
+    if (!item || !item.id) return;
     const nextRead = !item.read;
     const read_at = nextRead ? new Date().toISOString().split('T')[0] : null;
-    if (item.id && !String(item.id).startsWith('local-')) {
-      const { error } = await supabase.from('before_thirty').update({ read: nextRead, read_at }).eq('id', item.id);
-      if (!error) {
-        const updated = [...beforeThirtyBooks];
-        updated[index] = { ...updated[index], read: nextRead, read_at };
-        setBeforeThirtyBooks(updated);
-        try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify(updated)); } catch (e) {}
-      }
-    } else {
+
+    const { error } = await supabase.from('before_thirty').update({ read: nextRead, read_at }).eq('id', item.id).eq('user_id', user.id);
+    if (!error) {
       const updated = [...beforeThirtyBooks];
       updated[index] = { ...updated[index], read: nextRead, read_at };
       setBeforeThirtyBooks(updated);
-      try { localStorage.setItem(`arcana-before-thirty-${user.id}`, JSON.stringify(updated)); } catch (e) {}
     }
   }
 
